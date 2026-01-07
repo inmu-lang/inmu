@@ -1,45 +1,69 @@
-# Makefile for INMU language interpreter
+# Makefile for INMU Language - Bootstrap Build System
+# This orchestrates the multi-stage bootstrap process
 
-ASM = as
-LD = ld
-TARGET = inmu
+.PHONY: all stage0 stage1 stage2 stage3 clean test install help
 
-# Detect architecture
-ARCH := $(shell uname -m)
+# Default target - build Stage 0 interpreter
+all: stage0
 
-# Set source file based on architecture
-ifeq ($(ARCH),arm64)
-    SOURCE = src/mac/arm64/main.s
-    ARCH_FLAG = arm64
-else ifeq ($(ARCH),x86_64)
-    SOURCE = src/mac/x86_64/main.s
-    ARCH_FLAG = x86_64
-else
-    $(error Unsupported architecture: $(ARCH))
-endif
+# Stage 0: Assembly interpreter (foundation for everything)
+stage0:
+	@echo "Building Stage 0: Assembly Interpreter"
+	cd stage0 && $(MAKE)
+	cp stage0/inmu ./inmu
 
-.PHONY: all clean test universal install
+# Stage 1: INMU language compiler (written in INMU, runs on Stage 0)
+stage1: stage0
+	@echo "Building Stage 1: Self-hosting compiler (INMU -> Assembly)"
+	@echo "Not yet implemented - needs Stage 0 feature expansion first"
+	# cd stage1 && $(MAKE)
 
-all: $(TARGET)
+# Stage 2: Self-hosted compiler (Stage 1 compiles itself)
+stage2: stage1
+	@echo "Building Stage 2: Self-hosted compiler verification"
+	@echo "Not yet implemented"
+	# cd stage2 && $(MAKE)
 
-$(TARGET): $(SOURCE)
-	$(ASM) -o $(TARGET).o $(SOURCE)
-	$(LD) -o $(TARGET) $(TARGET).o -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _main -arch $(ARCH_FLAG)
+# Stage 3: Optimizing compiler
+stage3: stage2
+	@echo "Building Stage 3: Optimizing compiler"
+	@echo "Not yet implemented"
+	# cd stage3 && $(MAKE)
 
-# Build universal binary (both architectures)
-universal:
-	$(ASM) -arch arm64 -o $(TARGET)_arm64.o src/mac/arm64/main.s
-	$(LD) -arch arm64 -o $(TARGET)_arm64 $(TARGET)_arm64.o -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _main
-	$(ASM) -arch x86_64 -o $(TARGET)_x86_64.o src/mac/x86_64/main.s
-	$(LD) -arch x86_64 -o $(TARGET)_x86_64 $(TARGET)_x86_64.o -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _main
-	lipo -create $(TARGET)_arm64 $(TARGET)_x86_64 -output $(TARGET)
-	rm -f $(TARGET)_arm64 $(TARGET)_x86_64 $(TARGET)_arm64.o $(TARGET)_x86_64.o
-
+# Clean all build artifacts
 clean:
-	rm -f $(TARGET) $(TARGET).o $(TARGET)_arm64 $(TARGET)_x86_64 $(TARGET)_arm64.o $(TARGET)_x86_64.o
+	@echo "Cleaning all stages..."
+	cd stage0 && $(MAKE) clean
+	rm -f inmu
+	# cd stage1 && $(MAKE) clean
+	# cd stage2 && $(MAKE) clean
+	# cd stage3 && $(MAKE) clean
 
-test: $(TARGET)
-	./$(TARGET) examples/hello.inmu
+# Run tests for all implemented stages
+test: stage0
+	@echo "Running Stage 0 tests..."
+	cd stage0 && $(MAKE) test
+	# @echo "Running Stage 1 tests..."
+	# cd stage1 && $(MAKE) test
 
-install: $(TARGET)
-	cp $(TARGET) /usr/local/bin/
+# Install the current working compiler
+install: stage0
+	@echo "Installing INMU compiler..."
+	cd stage0 && $(MAKE) install
+
+# Show help
+help:
+	@echo "INMU Language Bootstrap Build System"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all      - Build Stage 0 (default)"
+	@echo "  stage0   - Build assembly interpreter"
+	@echo "  stage1   - Build self-hosting compiler (not yet implemented)"
+	@echo "  stage2   - Build verified self-hosted compiler (not yet implemented)"
+	@echo "  stage3   - Build optimizing compiler (not yet implemented)"
+	@echo "  clean    - Remove all build artifacts"
+	@echo "  test     - Run all tests"
+	@echo "  install  - Install INMU to /usr/local/bin"
+	@echo "  help     - Show this help message"
+	@echo ""
+	@echo "For more information, see BOOTSTRAP.md"
