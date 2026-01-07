@@ -2,7 +2,7 @@ name: Release macOS x86_64
 
 on:
   release:
-    types: [created]
+    types: [published, released, prereleased]
 
 jobs:
   build-and-upload:
