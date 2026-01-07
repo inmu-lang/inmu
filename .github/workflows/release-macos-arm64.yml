@@ -5,6 +5,8 @@ on:
     types: [created]
 
 jobs:
+  permissions:
+    contents: write
   build-and-upload:
     name: Build and Upload Release Assets
     runs-on: macos-latest
