@@ -5,7 +5,7 @@
 .align 2
 
 // Include print functionality
-.include "src/include/print.s"
+.include "src/mac/arm64/include/print.s"
 
 // System call numbers for macOS ARM64
 .equ SYS_EXIT,    1
