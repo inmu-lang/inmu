@@ -37,13 +37,3 @@ jobs:
           asset_path: ./inmu-lang/inmu-macos-x86_64.tar.gz
           asset_name: inmu-macos-x86_64.tar.gz
           asset_content_type: application/gzip
-      
-      - name: Upload binary only
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./inmu-lang/inmu
-          asset_name: inmu-macos-x86_64
-          asset_content_type: application/octet-stream
