@@ -3,7 +3,7 @@
 ASM = as
 LD = ld
 TARGET = inmu
-SOURCE = src/inmu.s
+SOURCE = src/main.s
 
 .PHONY: all clean test
 
