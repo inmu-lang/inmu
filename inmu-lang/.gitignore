@@ -1,0 +1,13 @@
+# Object files
+*.o
+
+# Executables
+inmu
+
+# macOS
+.DS_Store
+
+# Editor backups
+*~
+*.swp
+*.swo
