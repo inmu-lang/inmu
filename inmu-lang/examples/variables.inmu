@@ -1,0 +1,17 @@
+# Variable Declaration Example
+# 変数宣言の例
+
+# Simple variable declarations
+let x = 42
+let y = 100
+let z = 999
+
+# Print variables
+print "Variable x:"
+print x
+
+print "Variable y:"
+print y
+
+print "Variable z:"
+print z

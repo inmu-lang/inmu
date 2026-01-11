@@ -1,0 +1,10 @@
+# Test: Variable declaration and printing
+
+let x = 42
+print x
+
+let y = 100
+print y
+
+let z = 999
+print z

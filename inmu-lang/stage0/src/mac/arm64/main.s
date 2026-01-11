@@ -4,8 +4,9 @@
 .global _main
 .align 2
 
-// Include print functionality
+// Include functionality
 .include "src/mac/arm64/include/print.s"
+.include "src/mac/arm64/include/variables.s"
 
 // System call numbers for macOS ARM64
 .equ SYS_EXIT,    1
@@ -28,10 +29,12 @@ usage_len = . - usage_msg
 error_open:     .asciz "Error: Cannot open file\n"
 error_open_len = . - error_open
 
-hello_msg:      .asciz "Hello from INMU!\n"
+hello_msg:       .asciz "Hello from INMU!\\n"
 hello_len = . - hello_msg
 
-print_keyword:  .asciz "print"
+
+print_keyword:   .asciz "print"
+let_keyword:     .asciz "let"
 
 .bss
 .align 3
@@ -81,10 +84,16 @@ _main:
     // Save bytes read
     mov     x20, x0
     
+    // Debug: print bytes read
+    // (Commented out for now)
+    
     // Close file
     mov     x0, x19
     mov     x16, #SYS_CLOSE
     svc     #0x80
+    
+    // Initialize variable system
+    bl      init_variables
     
     // Execute the inmu program
     adrp    x0, file_buffer@PAGE
@@ -134,7 +143,10 @@ execute_inmu:
     mov     x19, x0
     mov     x20, x1
     
-    // Check for "print" command
+    // Initialize variable system
+    bl      init_variables
+    
+    // Parse and execute the program
     bl      parse_and_execute
     
     ldp     x29, x30, [sp], #16
@@ -148,33 +160,134 @@ parse_and_execute:
     mov     x23, #0             // Current search position
     
 parse_loop:
-    // Look for "print" keyword from current position
-    add     x0, x19, x23        // buffer + offset
-    sub     x1, x20, x23        // remaining length
-    cmp     x1, #0
-    b.le    parse_done
+    // Skip whitespace and comments
+skip_ws_and_comments:
+    cmp     x23, x20
+    b.ge    parse_done
     
+    add     x0, x19, x23
+    ldrb    w1, [x0]
+    
+    // Check for whitespace
+    cmp     w1, #' '
+    b.eq    skip_char
+    cmp     w1, #'\t'
+    b.eq    skip_char
+    cmp     w1, #'\n'
+    b.eq    skip_char
+    cmp     w1, #'\r'
+    b.eq    skip_char
+    
+    // Check for comment (#)
+    cmp     w1, #'#'
+    b.eq    skip_comment
+    
+    // Non-whitespace, non-comment character found
+    b       check_keywords
+    
+skip_char:
+    add     x23, x23, #1
+    b       skip_ws_and_comments
+    
+skip_comment:
+    // Skip until newline
+    add     x23, x23, #1
+    cmp     x23, x20
+    b.ge    parse_done
+    add     x0, x19, x23
+    ldrb    w1, [x0]
+    cmp     w1, #'\n'
+    b.ne    skip_comment
+    add     x23, x23, #1        // Skip the newline too
+    b       skip_ws_and_comments
+
+check_keywords:
+    // Check if current position starts with "let" keyword
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    adrp    x2, let_keyword@PAGE
+    add     x2, x2, let_keyword@PAGEOFF
+    mov     x3, #3
+    bl      check_keyword_at_position
+    
+    cmp     x0, #1
+    b.eq    found_let
+    
+    // Check for "print" keyword
+    add     x0, x19, x23
+    sub     x1, x20, x23
     adrp    x2, print_keyword@PAGE
     add     x2, x2, print_keyword@PAGEOFF
     mov     x3, #5
-    bl      find_keyword
+    bl      check_keyword_at_position
     
-    cmp     x0, #0
-    b.lt    parse_done          // No more print statements
+    cmp     x0, #1
+    b.eq    found_print
     
-    // Found print at relative position x0
-    add     x24, x23, x0        // Absolute position in buffer
+    // Unknown token - skip one char and continue
+    add     x23, x23, #1
+    b       parse_loop
+
+found_print:
+    // Call handle_print
+    add     x0, x19, x23
+    sub     x1, x20, x23
     bl      handle_print
     
-    // Move past this print statement
-    add     x23, x24, #1
+    // x0 contains bytes consumed
+    add     x23, x23, x0
+    b       parse_loop
+
+found_let:
+    // Parse the let statement
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    bl      parse_let_statement
+    
+    // x0 contains bytes consumed
+    add     x23, x23, x0
     b       parse_loop
     
 parse_done:
     ldp     x29, x30, [sp], #16
     ret
 
-// Find keyword in buffer
+// Check if keyword matches at current position
+// x0 = buffer, x1 = buffer_len, x2 = keyword, x3 = keyword_len
+// Returns: 1 if match, 0 if no match
+check_keyword_at_position:
+    stp     x29, x30, [sp, #-16]!
+    mov     x29, sp
+    
+    // Check if we have enough bytes
+    cmp     x1, x3
+    b.lt    no_match
+    
+    // Compare bytes
+    mov     x4, #0
+compare_kw_loop:
+    cmp     x4, x3
+    b.ge    match_found
+    
+    ldrb    w5, [x0, x4]
+    ldrb    w6, [x2, x4]
+    cmp     w5, w6
+    b.ne    no_match
+    
+    add     x4, x4, #1
+    b       compare_kw_loop
+    
+match_found:
+    mov     x0, #1
+    ldp     x29, x30, [sp], #16
+    ret
+    
+no_match:
+    mov     x0, #0
+    ldp     x29, x30, [sp], #16
+    ret
+
+// Find keyword in buffer (old version - kept for compatibility)
 // x0 = buffer, x1 = buffer_len, x2 = keyword, x3 = keyword_len
 // Returns: position or -1 if not found
 find_keyword:
