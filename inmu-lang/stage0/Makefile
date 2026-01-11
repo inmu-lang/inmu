@@ -18,7 +18,7 @@ else
     $(error Unsupported architecture: $(ARCH))
 endif
 
-.PHONY: all clean test universal install
+.PHONY: all clean test test-all test-verbose universal install
 
 all: $(TARGET)
 
@@ -38,8 +38,17 @@ universal:
 clean:
 	rm -f $(TARGET) $(TARGET).o $(TARGET)_arm64 $(TARGET)_x86_64 $(TARGET)_arm64.o $(TARGET)_x86_64.o
 
+# Run a simple test
 test: $(TARGET)
 	./$(TARGET) ../examples/hello.inmu
+
+# Run all tests
+test-all: $(TARGET)
+	./run_tests.sh
+
+# Run all tests with output
+test-verbose: $(TARGET)
+	./run_tests.sh --output
 
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/

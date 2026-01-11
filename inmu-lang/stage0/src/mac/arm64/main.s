@@ -2,11 +2,16 @@
 // ARM64 Assembly for macOS (Apple Silicon)
 
 .global _main
+.global print_keyword
+.global let_keyword
+.global if_keyword
 .align 2
 
 // Include functionality
 .include "src/mac/arm64/include/print.s"
 .include "src/mac/arm64/include/variables.s"
+.include "src/mac/arm64/include/expression.s"
+.include "src/mac/arm64/include/control.s"
 
 // System call numbers for macOS ARM64
 .equ SYS_EXIT,    1
@@ -35,6 +40,7 @@ hello_len = . - hello_msg
 
 print_keyword:   .asciz "print"
 let_keyword:     .asciz "let"
+if_keyword:      .asciz "if"
 
 .bss
 .align 3
@@ -202,6 +208,18 @@ skip_comment:
     b       skip_ws_and_comments
 
 check_keywords:
+    // TEMP: Skip if check for debugging
+    // // Check if current position starts with "if" keyword
+    // add     x0, x19, x23
+    // sub     x1, x20, x23
+    // adrp    x2, if_keyword@PAGE
+    // add     x2, x2, if_keyword@PAGEOFF
+    // mov     x3, #2
+    // bl      check_keyword_at_position
+    // 
+    // cmp     x0, #1
+    // b.eq    found_if
+    
     // Check if current position starts with "let" keyword
     add     x0, x19, x23
     sub     x1, x20, x23
@@ -226,6 +244,16 @@ check_keywords:
     
     // Unknown token - skip one char and continue
     add     x23, x23, #1
+    b       parse_loop
+
+found_if:
+    // Parse the if statement
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    bl      parse_if_statement
+    
+    // x0 contains bytes consumed
+    add     x23, x23, x0
     b       parse_loop
 
 found_print:

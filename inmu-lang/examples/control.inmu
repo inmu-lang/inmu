@@ -1,0 +1,28 @@
+# Control Flow Examples
+# 制御フローの例
+
+let x = 10
+let y = 5
+
+print "=== If/Else Examples ==="
+
+if x == 10
+print "x equals 10"
+endif
+
+if y == 10
+print "y equals 10"
+else
+print "y does not equal 10"
+endif
+
+# Nested conditions
+let age = 20
+
+if age == 18
+print "Just turned adult"
+else
+print "Not 18"
+endif
+
+print "=== Done ==="

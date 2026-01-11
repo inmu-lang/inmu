@@ -108,93 +108,24 @@ found_close_quote:
     ret
 
 print_variable_or_number:
-    // Extract variable name or number
-    sub     sp, sp, #64
-    mov     x22, sp
-    mov     x23, #0
+    // TEMP: Use simple parsing instead of expression evaluator for debugging
+    // add     x0, x19, x21        // Current position
+    // sub     x1, x20, x21        // Remaining length
+    // bl      parse_expression_advanced
+    // 
+    // // x0 = result value, x1 = bytes consumed
+    // mov     x22, x0             // Save result
+    // add     x21, x21, x1        // Update total bytes consumed
     
-    // Check if first character is a digit
-    sub     x0, x20, x21
-    cmp     x0, #0
-    b.le    token_done
+    // Simple fallback: just parse a single number
     add     x0, x19, x21
-    ldrb    w1, [x0]
-    cmp     w1, #'0'
-    b.lt    extract_variable
-    cmp     w1, #'9'
-    b.gt    extract_variable
-    
-    // It's a number - extract digits only
-extract_number:
-    sub     x0, x20, x21
-    cmp     x0, #0
-    b.le    token_done
-    
-    add     x0, x19, x21
-    ldrb    w1, [x0]
-    
-    // Check if it's a digit
-    cmp     w1, #'0'
-    b.lt    token_done
-    cmp     w1, #'9'
-    b.gt    token_done
-    
-    strb    w1, [x22, x23]
-    add     x23, x23, #1
-    add     x21, x21, #1
-    cmp     x23, #63
-    b.lt    extract_number
-    b       token_done
-
-extract_variable:
-    // Extract variable name (alphanumeric and underscore)
-    sub     x0, x20, x21
-    cmp     x0, #0
-    b.le    token_done
-    
-    add     x0, x19, x21
-    ldrb    w1, [x0]
-    
-    // Check if end of token (space, newline, etc.)
-    cmp     w1, #' '
-    b.eq    token_done
-    cmp     w1, #'\t'
-    b.eq    token_done
-    cmp     w1, #'\n'
-    b.eq    token_done
-    cmp     w1, #'\r'
-    b.eq    token_done
-    cmp     w1, #0
-    b.eq    token_done
-    
-    strb    w1, [x22, x23]
-    add     x23, x23, #1
-    add     x21, x21, #1
-    cmp     x23, #63
-    b.lt    extract_variable
-
-token_done:
-    strb    wzr, [x22, x23]     // Null terminate
-    
-    // Check if token is a number (first char is a digit)
-    ldrb    w0, [x22]
-    cmp     w0, #'0'
-    b.lt    try_variable
-    cmp     w0, #'9'
-    b.gt    try_variable
-    
-    // It's a number - parse it
-    mov     x0, x22
     bl      parse_number_simple
-    b       print_the_number
-    
-try_variable:
-    // Try to get as variable
-    mov     x0, x22
-    bl      get_variable
+    mov     x22, x0
+    add     x21, x21, x1
     
 print_the_number:
     // Print the number
+    mov     x0, x22
     bl      print_number
     
     // Print newline
@@ -207,11 +138,8 @@ print_the_number:
     
     // Return bytes consumed
     mov     x0, x21
-    
-    // Clean up: buffer (64) + frame (64) = 128 total
-    add     sp, sp, #64           // Remove buffer
-    ldp     x23, x24, [sp, #48]  
-    ldp     x21, x22, [sp, #32]  
+    ldp     x23, x24, [sp, #48]
+    ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #64
     ret

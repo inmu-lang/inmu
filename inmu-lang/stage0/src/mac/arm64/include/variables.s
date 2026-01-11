@@ -321,7 +321,14 @@ name_done:
     bl      skip_whitespace_simple
     sub     x21, x0, x19
     
-    // Parse expression (for now, just handle numbers)
+    // TEMP: Use simple number parsing instead of expression parser
+    // add     x0, x19, x21
+    // sub     x1, x20, x21
+    // bl      parse_expression_advanced
+    // mov     x23, x0             // Save value
+    // mov     x24, x1             // Save consumed bytes
+    
+    // Simple fallback: just parse a number
     add     x0, x19, x21
     bl      parse_number_simple
     mov     x23, x0             // Save value

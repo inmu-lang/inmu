@@ -1,0 +1,37 @@
+# Arithmetic Examples
+# 算術演算の例
+
+print "=== Basic Arithmetic ==="
+
+# Addition
+print 10 + 20
+
+# Subtraction  
+print 50 - 15
+
+# Multiplication
+print 7 * 6
+
+# Division
+print 100 / 4
+
+print "=== With Variables ==="
+
+let x = 10
+let y = 5
+
+print x + y
+print x - y
+print x * y
+print x / y
+
+print "=== Complex Expressions ==="
+
+# Order of operations
+print 10 + 5 * 2
+
+# With parentheses
+print (10 + 5) * 2
+
+let result = (x + y) * 2
+print result
