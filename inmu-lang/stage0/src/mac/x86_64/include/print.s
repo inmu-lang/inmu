@@ -93,72 +93,19 @@ found_close_quote:
     jmp     print_done
     
 print_variable_or_number:
-    // Check if it's a variable (starts with letter or underscore)
-    leaq    (%r12,%r14), %rdi
-    movzbl  (%rdi), %eax
-    
-    // Check for letter
-    cmpb    $'a', %al
-    jge     check_letter_upper_print
-    jmp     check_number_sign_print
-    
-check_letter_upper_print:
-    cmpb    $'z', %cl
-    jle     is_variable
-    cmpb    $'A', %cl
-    jl      check_underscore_print_var
-    cmpb    $'Z', %cl
-    jle     is_variable
-    
-check_underscore_print_var:
-    cmpb    $'_', %al
-    je      is_variable
-    
-check_number_sign_print:
-    // Must be a number
-    jmp     is_number
-    
-is_variable:
-    // Parse variable name
+    // Use the advanced expression parser with proper operator precedence
     leaq    (%r12,%r14), %rdi
     movq    %r13, %rsi
     subq    %r14, %rsi
-    call    parse_var_name_print
-    
-    cmpq    $0, %rax
-    jle     print_done
-    
-    movq    %rax, %rbx          // name length
-    leaq    (%r12,%r14), %r8    // name pointer
-    addq    %rax, %r14
-    
-    // Get variable value
-    movq    %r8, %rdi
-    movq    %rbx, %rsi
-    call    get_variable
-    
-    // %rax = value, %rdx = found flag
-    cmpq    $0, %rdx
-    je      print_done
-    
-    // Convert to string and print
-    movq    %rax, %rdi
-    call    print_number
-    
-    jmp     print_done
-    
-is_number:
-    // Parse number
-    leaq    (%r12,%r14), %rdi
-    movq    %r13, %rsi
-    subq    %r14, %rsi
-    call    parse_number_simple
+    call    parse_expression_advanced
     
     // %rax = value, %rdx = bytes consumed
-    addq    %rdx, %r14
+    movq    %rax, %rbx          // Save result value
+    addq    %rdx, %r14          // Update consumed bytes
     
-    // Print number
-    movq    %rax, %rdi
+print_the_number:
+    // Print the number in rbx
+    movq    %rbx, %rdi
     call    print_number
     
 print_done:

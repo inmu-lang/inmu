@@ -208,7 +208,7 @@ skip_comment:
     b       skip_ws_and_comments
 
 check_keywords:
-    // TEMP: Skip if check for debugging
+    // TEMP: Disable if for now
     // // Check if current position starts with "if" keyword
     // add     x0, x19, x23
     // sub     x1, x20, x23

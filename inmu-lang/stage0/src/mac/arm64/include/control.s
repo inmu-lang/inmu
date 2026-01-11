@@ -95,6 +95,12 @@ find_if_end_exec:
     cmp     x21, x20
     b.ge    if_done
     
+    // Skip whitespace and newline first
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_and_newline_ctrl
+    add     x21, x21, x0
+    
     // Check for "else" or "endif"
     add     x0, x19, x21
     sub     x1, x20, x21
@@ -103,7 +109,7 @@ find_if_end_exec:
     mov     x3, #4
     bl      check_keyword_at_pos_ctrl
     cmp     x0, #1
-    b.eq    found_else_exec
+    b.eq    found_else_in_true
     
     add     x0, x19, x21
     sub     x1, x20, x21
@@ -120,34 +126,28 @@ find_if_end_exec:
     bl      parse_and_execute_one_statement
     add     x21, x21, x0
     
+    b       find_if_end_exec
+    
+found_else_in_true:
+    // We found else, skip the else block and go to endif
+    add     x21, x21, #4        // Skip "else"
+    b       skip_to_endif_only
+    
+skip_to_endif_only:
+    // Skip until we find endif
+find_endif_only:
+    cmp     x21, x20
+    b.ge    if_done
+    
     // Skip whitespace and newline
     add     x0, x19, x21
     sub     x1, x20, x21
     bl      skip_whitespace_and_newline_ctrl
     add     x21, x21, x0
     
-    b       find_if_end_exec
-    
-found_else_exec:
-    // Skip to endif
-    add     x21, x21, #4        // Skip "else"
-    b       skip_else_body
-    
-skip_if_body:
-    // Skip until else or endif
-find_else_or_endif:
+    // Check if we've gone past buffer
     cmp     x21, x20
     b.ge    if_done
-    
-    // Check for "else"
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    adrp    x2, else_keyword@PAGE
-    add     x2, x2, else_keyword@PAGEOFF
-    mov     x3, #4
-    bl      check_keyword_at_pos_ctrl
-    cmp     x0, #1
-    b.eq    found_else_skip
     
     // Check for "endif"
     add     x0, x19, x21
@@ -159,7 +159,78 @@ find_else_or_endif:
     cmp     x0, #1
     b.eq    if_done
     
-    // Skip one character
+    // Skip to end of line
+skip_endif_line:
+    cmp     x21, x20
+    b.ge    if_done
+    ldrb    w0, [x19, x21]
+    add     x21, x21, #1
+    cmp     w0, #'\n'
+    b.eq    find_endif_only
+    cmp     w0, #'\r'
+    b.ne    skip_endif_line
+    // Found \r, check for \r\n
+    cmp     x21, x20
+    b.ge    find_endif_only
+    ldrb    w0, [x19, x21]
+    cmp     w0, #'\n'
+    b.ne    find_endif_only
+    add     x21, x21, #1
+    b       find_endif_only
+    
+skip_if_body:
+    // Skip until else or endif
+    // At this point x21 should be at the beginning of the first statement in if body
+find_else_or_endif:
+    cmp     x21, x20
+    b.ge    if_done
+    
+    // Skip whitespace and newline at start
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_and_newline_ctrl
+    add     x21, x21, x0
+    
+    // Check if we're at the end
+    cmp     x21, x20
+    b.ge    if_done
+    
+    // Check for "else" at current position
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    adrp    x2, else_keyword@PAGE
+    add     x2, x2, else_keyword@PAGEOFF
+    mov     x3, #4
+    bl      check_keyword_at_pos_ctrl
+    cmp     x0, #1
+    b.eq    found_else_skip
+    
+    // Check for "endif" at current position
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    adrp    x2, endif_keyword@PAGE
+    add     x2, x2, endif_keyword@PAGEOFF
+    mov     x3, #5
+    bl      check_keyword_at_pos_ctrl
+    cmp     x0, #1
+    b.eq    if_done
+    
+    // Not else or endif, skip to end of this line
+skip_line_loop:
+    cmp     x21, x20
+    b.ge    if_done
+    ldrb    w0, [x19, x21]
+    add     x21, x21, #1
+    cmp     w0, #'\n'
+    b.eq    find_else_or_endif
+    cmp     w0, #'\r'
+    b.ne    skip_line_loop
+    // Found \r, check if followed by \n
+    cmp     x21, x20
+    b.ge    find_else_or_endif
+    ldrb    w0, [x19, x21]
+    cmp     w0, #'\n'
+    b.ne    find_else_or_endif
     add     x21, x21, #1
     b       find_else_or_endif
     
@@ -177,6 +248,12 @@ execute_else_body:
     cmp     x21, x20
     b.ge    if_done
     
+    // Skip whitespace and newline
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_and_newline_ctrl
+    add     x21, x21, x0
+    
     // Check for "endif"
     add     x0, x19, x21
     sub     x1, x20, x21
@@ -193,32 +270,7 @@ execute_else_body:
     bl      parse_and_execute_one_statement
     add     x21, x21, x0
     
-    // Skip whitespace
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    bl      skip_whitespace_and_newline_ctrl
-    add     x21, x21, x0
-    
     b       execute_else_body
-    
-skip_else_body:
-    // Skip to endif
-find_endif_after_else:
-    cmp     x21, x20
-    b.ge    if_done
-    
-    // Check for "endif"
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    adrp    x2, endif_keyword@PAGE
-    add     x2, x2, endif_keyword@PAGEOFF
-    mov     x3, #5
-    bl      check_keyword_at_pos_ctrl
-    cmp     x0, #1
-    b.eq    if_done
-    
-    add     x21, x21, #1
-    b       find_endif_after_else
     
 if_error:
     mov     x0, #0
@@ -365,5 +417,25 @@ skip_wsnl_char:
     b       skip_wsnl_loop
     
 skip_wsnl_done:
+    mov     x0, x2
+    ret
+
+// Skip to newline (but don't skip the newline itself)
+skip_to_newline_ctrl:
+    mov     x2, #0
+skip_nl_loop:
+    cmp     x2, x1
+    b.ge    skip_nl_done
+    
+    ldrb    w3, [x0, x2]
+    cmp     w3, #'\n'
+    b.eq    skip_nl_done
+    cmp     w3, #'\r'
+    b.eq    skip_nl_done
+    
+    add     x2, x2, #1
+    b       skip_nl_loop
+    
+skip_nl_done:
     mov     x0, x2
     ret

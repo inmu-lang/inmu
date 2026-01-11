@@ -108,20 +108,12 @@ found_close_quote:
     ret
 
 print_variable_or_number:
-    // TEMP: Use simple parsing instead of expression evaluator for debugging
-    // add     x0, x19, x21        // Current position
-    // sub     x1, x20, x21        // Remaining length
-    // bl      parse_expression_advanced
-    // 
-    // // x0 = result value, x1 = bytes consumed
-    // mov     x22, x0             // Save result
-    // add     x21, x21, x1        // Update total bytes consumed
-    
-    // Simple fallback: just parse a single number
+    // Use the advanced expression parser with proper operator precedence
     add     x0, x19, x21
-    bl      parse_number_simple
-    mov     x22, x0
-    add     x21, x21, x1
+    sub     x1, x20, x21
+    bl      parse_expression_advanced
+    mov     x22, x0             // Save result value
+    add     x21, x21, x1        // Update consumed bytes
     
 print_the_number:
     // Print the number
@@ -142,6 +134,171 @@ print_the_number:
     ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #64
+    ret
+
+print_zero_value:
+    // Print 0 when no valid input found
+    mov     x22, #0
+    b       print_the_number
+
+// Skip whitespace
+// x0 = buffer pointer, x1 = buffer length
+// Returns: x0 = bytes skipped
+skip_whitespace_print:
+    mov     x2, #0
+skip_ws_loop_print:
+    cmp     x2, x1
+    b.ge    skip_ws_done_print
+    
+    ldrb    w3, [x0, x2]
+    cmp     w3, #' '
+    b.eq    skip_ws_char_print
+    cmp     w3, #'\t'
+    b.eq    skip_ws_char_print
+    
+    // Not whitespace
+    b       skip_ws_done_print
+    
+skip_ws_char_print:
+    add     x2, x2, #1
+    b       skip_ws_loop_print
+    
+skip_ws_done_print:
+    mov     x0, x2
+    ret
+
+// Skip whitespace and newlines
+// x0 = buffer pointer, x1 = buffer length
+// Returns: x0 = bytes skipped
+skip_whitespace_and_newline_print:
+    mov     x2, #0
+skip_wsnl_loop_print:
+    cmp     x2, x1
+    b.ge    skip_wsnl_done_print
+    
+    ldrb    w3, [x0, x2]
+    cmp     w3, #' '
+    b.eq    skip_wsnl_char_print
+    cmp     w3, #'\t'
+    b.eq    skip_wsnl_char_print
+    cmp     w3, #'\n'
+    b.eq    skip_wsnl_char_print
+    cmp     w3, #'\r'
+    b.eq    skip_wsnl_char_print
+    
+    // Not whitespace or newline
+    b       skip_wsnl_done_print
+    
+skip_wsnl_char_print:
+    add     x2, x2, #1
+    b       skip_wsnl_loop_print
+    
+skip_wsnl_done_print:
+    mov     x0, x2
+    ret
+
+// Parse a term (number or variable)
+// x0 = buffer pointer, x1 = buffer length
+// Returns: x0 = value, x1 = bytes consumed
+parse_term_value:
+    stp     x29, x30, [sp, #-32]!
+    mov     x29, sp
+    stp     x19, x20, [sp, #16]
+    
+    mov     x19, x0
+    mov     x20, x1
+    
+    // Check if empty
+    cmp     x20, #0
+    b.le    term_val_zero
+    
+    // Check first character
+    ldrb    w1, [x19]
+    
+    // Check if digit
+    cmp     w1, #'0'
+    b.lt    try_var_term
+    cmp     w1, #'9'
+    b.le    parse_num_term
+    
+try_var_term:
+    // Check if letter or underscore
+    cmp     w1, #'_'
+    b.eq    parse_var_term
+    cmp     w1, #'a'
+    b.lt    check_upper_term
+    cmp     w1, #'z'
+    b.le    parse_var_term
+check_upper_term:
+    cmp     w1, #'A'
+    b.lt    term_val_zero
+    cmp     w1, #'Z'
+    b.gt    term_val_zero
+    
+parse_var_term:
+    // Extract variable name
+    sub     sp, sp, #64
+    mov     x2, sp
+    mov     x3, #0
+    
+extract_vname:
+    cmp     x3, #31
+    b.ge    vname_done
+    cmp     x3, x20
+    b.ge    vname_done
+    
+    ldrb    w4, [x19, x3]
+    
+    // Check if valid variable character
+    cmp     w4, #'_'
+    b.eq    valid_vchar
+    cmp     w4, #'a'
+    b.lt    check_vupper
+    cmp     w4, #'z'
+    b.le    valid_vchar
+check_vupper:
+    cmp     w4, #'A'
+    b.lt    check_vdigit
+    cmp     w4, #'Z'
+    b.le    valid_vchar
+check_vdigit:
+    cmp     w4, #'0'
+    b.lt    vname_done
+    cmp     w4, #'9'
+    b.gt    vname_done
+    
+valid_vchar:
+    strb    w4, [x2, x3]
+    add     x3, x3, #1
+    b       extract_vname
+    
+vname_done:
+    strb    wzr, [x2, x3]
+    
+    // Get variable value
+    mov     x0, x2
+    bl      get_variable
+    mov     x1, x3              // Bytes consumed
+    
+    add     sp, sp, #64
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #32
+    ret
+    
+parse_num_term:
+    mov     x0, x19
+    mov     x1, x20
+    bl      parse_number_simple
+    
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #32
+    ret
+    
+term_val_zero:
+    mov     x0, #0
+    mov     x1, #0
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #32
     ret
 
 // Print number in x0

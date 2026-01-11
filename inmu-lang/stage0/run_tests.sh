@@ -28,21 +28,43 @@ total_tests=0
 passed_tests=0
 failed_tests=0
 
-# Function to run a single test
+# Function to run a single test with timeout
 run_test() {
     local test_file=$1
     local test_name=$(basename "$test_file")
+    local timeout=5
     
     total_tests=$((total_tests + 1))
     
     echo -ne "${YELLOW}Testing:${NC} $test_name ... "
     
-    if ./inmu "$test_file" > /dev/null 2>&1; then
+    # Run test in background with timeout
+    ./inmu "$test_file" > /dev/null 2>&1 &
+    local pid=$!
+    
+    # Wait for completion or timeout
+    local count=0
+    while kill -0 $pid 2>/dev/null; do
+        if [ $count -ge $timeout ]; then
+            kill -9 $pid 2>/dev/null
+            echo -e "${RED}✗ TIMEOUT${NC}"
+            failed_tests=$((failed_tests + 1))
+            return 1
+        fi
+        sleep 0.1
+        count=$((count + 1))
+    done
+    
+    # Check exit code
+    wait $pid
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
         echo -e "${GREEN}✓ PASS${NC}"
         passed_tests=$((passed_tests + 1))
         return 0
     else
-        echo -e "${RED}✗ FAIL${NC}"
+        echo -e "${RED}✗ FAIL (exit: $exit_code)${NC}"
         failed_tests=$((failed_tests + 1))
         return 1
     fi

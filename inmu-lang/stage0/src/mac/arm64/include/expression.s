@@ -1,6 +1,6 @@
 // expression.s - Expression evaluation for INMU interpreter
 // ARM64 Assembly for macOS (Apple Silicon)
-// Supports: +, -, *, / operators and parentheses
+// Supports: +, -, *, / operators and parentheses with correct precedence
 
 .global evaluate_expression
 .global parse_expression_advanced
@@ -10,7 +10,8 @@ expr_debug_msg:     .asciz "Evaluating expression\n"
 
 .text
 
-// Advanced expression parser with operators
+// Expression parser with correct operator precedence
+// Precedence: +/- (low) < */ (high) < primary (number/variable/parenthesis)
 // x0 = buffer pointer
 // x1 = buffer length
 // Returns: x0 = value, x1 = bytes consumed
@@ -24,12 +25,12 @@ parse_expression_advanced:
     mov     x20, x1             // Save length
     mov     x21, #0             // Bytes consumed
     
-    // Parse first term (number or variable or parenthesis)
+    // Parse first multiplication/division level expression
     mov     x0, x19
     mov     x1, x20
-    bl      parse_term
+    bl      parse_mul_div
     
-    // Check if first term parsing succeeded
+    // Check if parsing succeeded
     cmp     x1, #0
     b.le    expr_done           // If no bytes consumed, return 0
     
@@ -37,39 +38,34 @@ parse_expression_advanced:
     add     x21, x21, x1        // Update consumed
     
 expr_loop:
+    // Check if we have more to parse
+    cmp     x21, x20
+    b.ge    expr_done
+    
     // Skip whitespace
     add     x0, x19, x21
     sub     x1, x20, x21
     bl      skip_whitespace_expr
     add     x21, x21, x0
     
-    // Check if we have more to parse
+    // Check again if we have more to parse
     cmp     x21, x20
     b.ge    expr_done
     
-    // Check for operator
+    // Check for + or -
     add     x0, x19, x21
     ldrb    w1, [x0]
     
-    // Check for + - * /
     cmp     w1, #'+'
     b.eq    found_plus
     cmp     w1, #'-'
     b.eq    found_minus
-    cmp     w1, #'*'
-    b.eq    found_mult
-    cmp     w1, #'/'
-    b.eq    found_div
     
-    // Not an operator, done
+    // Not + or -, done
     b       expr_done
     
 found_plus:
     add     x21, x21, #1        // Skip '+'
-    
-    // Check if we have more to parse
-    cmp     x21, x20
-    b.ge    expr_done
     
     // Skip whitespace after operator
     add     x0, x19, x21
@@ -77,18 +73,18 @@ found_plus:
     bl      skip_whitespace_expr
     add     x21, x21, x0
     
-    // Check again after whitespace
+    // Check if we have more to parse
     cmp     x21, x20
     b.ge    expr_done
     
-    // Parse next term
+    // Parse next multiplication/division level
     add     x0, x19, x21
     sub     x1, x20, x21
-    bl      parse_term
+    bl      parse_mul_div
     
-    // Check if term parsing succeeded (consumed > 0)
+    // Check if parsing succeeded
     cmp     x1, #0
-    b.le    expr_done           // If no bytes consumed, stop
+    b.le    expr_done
     
     add     x22, x22, x0        // Add to result
     add     x21, x21, x1        // Update consumed
@@ -97,100 +93,28 @@ found_plus:
 found_minus:
     add     x21, x21, #1        // Skip '-'
     
-    // Check if we have more to parse
-    cmp     x21, x20
-    b.ge    expr_done
-    
-    // Skip whitespace
+    // Skip whitespace after operator
     add     x0, x19, x21
     sub     x1, x20, x21
     bl      skip_whitespace_expr
     add     x21, x21, x0
     
-    // Check again after whitespace
+    // Check if we have more to parse
     cmp     x21, x20
     b.ge    expr_done
     
-    // Parse next term
+    // Parse next multiplication/division level
     add     x0, x19, x21
     sub     x1, x20, x21
-    bl      parse_term
+    bl      parse_mul_div
     
-    // Check if term parsing succeeded
+    // Check if parsing succeeded
     cmp     x1, #0
     b.le    expr_done
     
     sub     x22, x22, x0        // Subtract from result
     add     x21, x21, x1        // Update consumed
     b       expr_loop
-    
-found_mult:
-    add     x21, x21, #1        // Skip '*'
-    
-    // Check if we have more to parse
-    cmp     x21, x20
-    b.ge    expr_done
-    
-    // Skip whitespace
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    bl      skip_whitespace_expr
-    add     x21, x21, x0
-    
-    // Check again after whitespace
-    cmp     x21, x20
-    b.ge    expr_done
-    
-    // Parse next term
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    bl      parse_term
-    
-    // Check if term parsing succeeded
-    cmp     x1, #0
-    b.le    expr_done
-    
-    mul     x22, x22, x0        // Multiply result
-    add     x21, x21, x1        // Update consumed
-    b       expr_loop
-    
-found_div:
-    add     x21, x21, #1        // Skip '/'
-    
-    // Check if we have more to parse
-    cmp     x21, x20
-    b.ge    expr_done
-    
-    // Skip whitespace
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    bl      skip_whitespace_expr
-    add     x21, x21, x0
-    
-    // Check again after whitespace
-    cmp     x21, x20
-    b.ge    expr_done
-    
-    // Parse next term
-    add     x0, x19, x21
-    sub     x1, x20, x21
-    bl      parse_term
-    
-    // Check if term parsing succeeded
-    cmp     x1, #0
-    b.le    expr_done
-    
-    // Check for division by zero
-    cmp     x0, #0
-    b.eq    div_by_zero
-    
-    udiv    x22, x22, x0        // Divide result
-    add     x21, x21, x1        // Update consumed
-    b       expr_loop
-    
-div_by_zero:
-    // Return 0 on division by zero
-    mov     x22, #0
     
 expr_done:
     mov     x0, x22             // Return value
@@ -201,21 +125,144 @@ expr_done:
     ldp     x29, x30, [sp], #48
     ret
 
-// Parse a term (number, variable, or parenthesized expression)
+// Parse multiplication and division level
 // x0 = buffer pointer
 // x1 = buffer length
 // Returns: x0 = value, x1 = bytes consumed
-parse_term:
-    stp     x29, x30, [sp, #-32]!
+parse_mul_div:
+    stp     x29, x30, [sp, #-48]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
+    
+    mov     x19, x0             // Save buffer
+    mov     x20, x1             // Save length
+    mov     x21, #0             // Bytes consumed
+    
+    // Parse first primary (number, variable, or parenthesized expression)
+    mov     x0, x19
+    mov     x1, x20
+    bl      parse_primary
+    
+    // Check if parsing succeeded
+    cmp     x1, #0
+    b.le    mul_div_done        // If no bytes consumed, return 0
+    
+    mov     x22, x0             // Result value
+    add     x21, x21, x1        // Update consumed
+    
+mul_div_loop:
+    // Check if we have more to parse
+    cmp     x21, x20
+    b.ge    mul_div_done
+    
+    // Skip whitespace
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_expr
+    add     x21, x21, x0
+    
+    // Check again if we have more to parse
+    cmp     x21, x20
+    b.ge    mul_div_done
+    
+    // Check for * or /
+    add     x0, x19, x21
+    ldrb    w1, [x0]
+    
+    cmp     w1, #'*'
+    b.eq    found_mult
+    cmp     w1, #'/'
+    b.eq    found_div
+    
+    // Not * or /, done
+    b       mul_div_done
+    
+found_mult:
+    add     x21, x21, #1        // Skip '*'
+    
+    // Skip whitespace after operator
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_expr
+    add     x21, x21, x0
+    
+    // Check if we have more to parse
+    cmp     x21, x20
+    b.ge    mul_div_done
+    
+    // Parse next primary
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      parse_primary
+    
+    // Check if parsing succeeded
+    cmp     x1, #0
+    b.le    mul_div_done
+    
+    mul     x22, x22, x0        // Multiply result
+    add     x21, x21, x1        // Update consumed
+    b       mul_div_loop
+    
+found_div:
+    add     x21, x21, #1        // Skip '/'
+    
+    // Skip whitespace after operator
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_expr
+    add     x21, x21, x0
+    
+    // Check if we have more to parse
+    cmp     x21, x20
+    b.ge    mul_div_done
+    
+    // Parse next primary
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      parse_primary
+    
+    // Check if parsing succeeded
+    cmp     x1, #0
+    b.le    mul_div_done
+    
+    // Check for division by zero
+    cmp     x0, #0
+    b.eq    div_by_zero_mul_div
+    
+    udiv    x22, x22, x0        // Divide result
+    add     x21, x21, x1        // Update consumed
+    b       mul_div_loop
+    
+div_by_zero_mul_div:
+    // Just continue with current result on division by zero
+    b       mul_div_loop
+    
+mul_div_done:
+    mov     x0, x22             // Return value
+    mov     x1, x21             // Return bytes consumed
+    
+    ldp     x21, x22, [sp, #32]
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #48
+    ret
+
+// Parse a primary (number, variable, or parenthesized expression)
+// x0 = buffer pointer
+// x1 = buffer length
+// Returns: x0 = value, x1 = bytes consumed
+parse_primary:
+    stp     x29, x30, [sp, #-48]!
+    mov     x29, sp
+    stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
     
     mov     x19, x0
     mov     x20, x1
     
     // Check if buffer is empty
     cmp     x20, #0
-    b.le    term_empty
+    b.le    primary_empty
     
     // Skip whitespace
     mov     x0, x19
@@ -227,7 +274,7 @@ parse_term:
     
     // Check again if buffer is now empty
     cmp     x20, #0
-    b.le    term_empty
+    b.le    primary_empty
     
     // Check first character
     ldrb    w1, [x19]
@@ -240,7 +287,7 @@ parse_term:
     cmp     w1, #'0'
     b.lt    try_variable
     cmp     w1, #'9'
-    b.le    parse_number_term
+    b.le    parse_number_primary
     
 try_variable:
     // Check if valid variable start (letter or underscore)
@@ -252,9 +299,9 @@ try_variable:
     b.le    parse_as_variable
 check_upper_var:
     cmp     w1, #'A'
-    b.lt    term_empty          // Not a valid start, return 0
+    b.lt    primary_empty       // Not a valid start, return 0
     cmp     w1, #'Z'
-    b.gt    term_empty          // Not a valid start, return 0
+    b.gt    primary_empty       // Not a valid start, return 0
     
 parse_as_variable:
     // Try to parse as variable
@@ -263,19 +310,21 @@ parse_as_variable:
     bl      parse_variable_ref
     add     x1, x1, x21         // Add whitespace bytes
     
+    ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
-    ldp     x29, x30, [sp], #32
+    ldp     x29, x30, [sp], #48
     ret
     
-parse_number_term:
+parse_number_primary:
     // Parse as number
     mov     x0, x19
     mov     x1, x20
     bl      parse_number_simple
     add     x1, x1, x21         // Add whitespace bytes
     
+    ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
-    ldp     x29, x30, [sp], #32
+    ldp     x29, x30, [sp], #48
     ret
     
 parse_paren:
@@ -299,6 +348,11 @@ parse_paren:
     bl      skip_whitespace_expr
     add     x21, x21, x0
     add     x19, x19, x0
+    sub     x20, x20, x0
+    
+    // Check if we still have characters
+    cmp     x20, #0
+    b.le    paren_done
     
     // Expect ')'
     ldrb    w1, [x19]
@@ -311,15 +365,17 @@ paren_done:
     mov     x0, x22             // Return value
     mov     x1, x21             // Return bytes consumed
     
+    ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
-    ldp     x29, x30, [sp], #32
+    ldp     x29, x30, [sp], #48
     ret
 
-term_empty:
+primary_empty:
     mov     x0, #0              // Return 0
     mov     x1, #0              // 0 bytes consumed
+    ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
-    ldp     x29, x30, [sp], #32
+    ldp     x29, x30, [sp], #48
     ret
 
 // Parse variable reference
@@ -400,6 +456,12 @@ var_name_done:
 // x1 = buffer length
 // Returns: x0 = bytes skipped
 skip_whitespace_expr:
+    // Check if buffer length is 0 or negative (as unsigned, very large)
+    cbz     x1, skip_ws_done_expr
+    mov     x4, #0x7FFFFFFFFFFFFFFF
+    cmp     x1, x4
+    b.hi    skip_ws_done_expr    // If buffer length > max signed int, it's negative
+    
     mov     x2, #0
 skip_ws_loop_expr:
     cmp     x2, x1

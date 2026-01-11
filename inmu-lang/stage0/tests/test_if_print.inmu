@@ -1,0 +1,5 @@
+let x = 10
+if x == 10
+print "Inside if"
+endif
+print "After if"

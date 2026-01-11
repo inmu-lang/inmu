@@ -1,0 +1,8 @@
+# Test 1: true condition
+let x = 10
+
+if x == 10
+print "Test 1 passed"
+endif
+
+print "Done"

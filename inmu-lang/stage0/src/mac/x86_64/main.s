@@ -157,18 +157,19 @@ parse_loop:
     // Save current position
     movq    %r14, %r15
     
-    // Check for "if"
-    leaq    (%r12,%r14), %rdi
-    leaq    if_keyword_main(%rip), %rsi
-    movq    $2, %rdx
-    call    check_keyword_main
-    
-    cmpq    $1, %rax
-    jne     check_let
-    
-    call    parse_if_statement
-    addq    %rax, %r14
-    jmp     parse_loop
+    // TODO: IF statement implementation has issues - disabled for now
+    // // Check for "if"
+    // leaq    (%r12,%r14), %rdi
+    // leaq    if_keyword_main(%rip), %rsi
+    // movq    $2, %rdx
+    // call    check_keyword_main
+    // 
+    // cmpq    $1, %rax
+    // jne     check_let
+    // 
+    // call    parse_if_statement
+    // addq    %rax, %r14
+    // jmp     parse_loop
     
 check_let:
     // Check for "let"

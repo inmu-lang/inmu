@@ -257,9 +257,27 @@ parse_let_statement:
     mov     x21, #3
     
     // Skip whitespace
-    add     x0, x19, x21
-    bl      skip_whitespace_simple
-    sub     x21, x0, x19        // Update position
+    mov     x0, #0              // Counter
+skip_ws_after_let:
+    add     x1, x21, x0         // Current position
+    cmp     x1, x20             // Check bounds
+    b.ge    ws_after_let_done
+    add     x2, x19, x1         // Buffer address
+    ldrb    w3, [x2]
+    cmp     w3, #' '
+    b.eq    inc_ws_let
+    cmp     w3, #'\t'
+    b.eq    inc_ws_let
+    cmp     w3, #'\n'
+    b.eq    inc_ws_let
+    cmp     w3, #'\r'
+    b.eq    inc_ws_let
+    b       ws_after_let_done
+inc_ws_let:
+    add     x0, x0, #1
+    b       skip_ws_after_let
+ws_after_let_done:
+    add     x21, x21, x0        // Update position
     
     // Extract variable name
     sub     sp, sp, #64         // Space for name buffer
@@ -268,6 +286,8 @@ parse_let_statement:
     mov     x0, #0              // Name length counter
 extract_name_loop:
     add     x1, x19, x21
+    cmp     x21, x20            // Check bounds
+    b.ge    name_done
     ldrb    w2, [x1]
     
     // Check if alphanumeric or underscore
@@ -305,11 +325,32 @@ name_done:
     cmp     x0, #0
     b.eq    let_error
     
-    add     x0, x19, x21
-    bl      skip_whitespace_simple
-    sub     x21, x0, x19
+    // Skip whitespace after variable name
+    mov     x0, #0              // Counter
+skip_ws_before_eq:
+    add     x1, x21, x0         // Current position
+    cmp     x1, x20             // Check bounds
+    b.ge    ws_before_eq_done
+    add     x2, x19, x1         // Buffer address
+    ldrb    w3, [x2]
+    cmp     w3, #' '
+    b.eq    inc_ws_eq
+    cmp     w3, #'\t'
+    b.eq    inc_ws_eq
+    cmp     w3, #'\n'
+    b.eq    inc_ws_eq
+    cmp     w3, #'\r'
+    b.eq    inc_ws_eq
+    b       ws_before_eq_done
+inc_ws_eq:
+    add     x0, x0, #1
+    b       skip_ws_before_eq
+ws_before_eq_done:
+    add     x21, x21, x0
     
     // Check for '='
+    cmp     x21, x20            // Check bounds
+    b.ge    let_error
     add     x0, x19, x21
     ldrb    w1, [x0]
     cmp     w1, #'='
@@ -317,20 +358,32 @@ name_done:
     add     x21, x21, #1
     
     // Skip whitespace after '='
-    add     x0, x19, x21
-    bl      skip_whitespace_simple
-    sub     x21, x0, x19
+    mov     x0, #0              // Counter
+skip_ws_after_eq:
+    add     x1, x21, x0         // Current position
+    cmp     x1, x20             // Check bounds
+    b.ge    ws_after_eq_done
+    add     x2, x19, x1         // Buffer address
+    ldrb    w3, [x2]
+    cmp     w3, #' '
+    b.eq    inc_ws_after_eq
+    cmp     w3, #'\t'
+    b.eq    inc_ws_after_eq
+    cmp     w3, #'\n'
+    b.eq    inc_ws_after_eq
+    cmp     w3, #'\r'
+    b.eq    inc_ws_after_eq
+    b       ws_after_eq_done
+inc_ws_after_eq:
+    add     x0, x0, #1
+    b       skip_ws_after_eq
+ws_after_eq_done:
+    add     x21, x21, x0
     
-    // TEMP: Use simple number parsing instead of expression parser
-    // add     x0, x19, x21
-    // sub     x1, x20, x21
-    // bl      parse_expression_advanced
-    // mov     x23, x0             // Save value
-    // mov     x24, x1             // Save consumed bytes
-    
-    // Simple fallback: just parse a number
+    // Use expression parser to evaluate the right-hand side
     add     x0, x19, x21
-    bl      parse_number_simple
+    sub     x1, x20, x21
+    bl      parse_expression_advanced
     mov     x23, x0             // Save value
     mov     x24, x1             // Save consumed bytes
     
@@ -341,6 +394,12 @@ name_done:
     
     // Calculate total bytes consumed
     add     x21, x21, x24       // Add number bytes
+    
+    // Skip trailing whitespace and newline
+    add     x0, x19, x21
+    sub     x1, x20, x21
+    bl      skip_whitespace_and_newline_var
+    add     x21, x21, x0
     
     add     sp, sp, #64         // Clean up name buffer
     mov     x0, x21             // Return bytes consumed
@@ -355,6 +414,36 @@ let_done:
     ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #64
+    ret
+
+// Skip whitespace and newlines
+// x0 = buffer pointer, x1 = buffer length
+// Returns: x0 = bytes skipped
+skip_whitespace_and_newline_var:
+    mov     x2, #0
+skip_wsnl_loop_var:
+    cmp     x2, x1
+    b.ge    skip_wsnl_done_var
+    
+    ldrb    w3, [x0, x2]
+    cmp     w3, #' '
+    b.eq    skip_wsnl_char_var
+    cmp     w3, #'\t'
+    b.eq    skip_wsnl_char_var
+    cmp     w3, #'\n'
+    b.eq    skip_wsnl_char_var
+    cmp     w3, #'\r'
+    b.eq    skip_wsnl_char_var
+    
+    // Not whitespace or newline
+    b       skip_wsnl_done_var
+    
+skip_wsnl_char_var:
+    add     x2, x2, #1
+    b       skip_wsnl_loop_var
+    
+skip_wsnl_done_var:
+    mov     x0, x2
     ret
 
 // Skip whitespace (simple version)
@@ -378,28 +467,41 @@ skip_ws_char:
     b       skip_ws_loop
 
 // Parse number from buffer
-// x0 = buffer pointer
+// x0 = buffer pointer, x1 = buffer length (optional, if 0 will read until non-digit)
 // Returns: number in x0, bytes consumed in x1
 parse_number_simple:
+    stp     x29, x30, [sp, #-16]!
+    mov     x29, sp
+    
     mov     x2, #0              // Result
-    mov     x1, #0              // Bytes consumed
+    mov     x3, #0              // Bytes consumed
+    mov     x4, x1              // Save buffer length
+    
 parse_num_loop:
-    ldrb    w3, [x0, x1]
-    cmp     w3, #'0'
+    // Check buffer length if provided (x4 != 0)
+    cbz     x4, skip_length_check
+    cmp     x3, x4
+    b.ge    parse_num_done
+    
+skip_length_check:
+    ldrb    w5, [x0, x3]
+    cmp     w5, #'0'
     b.lt    parse_num_done
-    cmp     w3, #'9'
+    cmp     w5, #'9'
     b.gt    parse_num_done
     
     // result = result * 10 + (digit - '0')
-    mov     x4, #10
-    mul     x2, x2, x4
-    sub     w3, w3, #'0'
-    add     x2, x2, x3
+    mov     x6, #10
+    mul     x2, x2, x6
+    sub     w5, w5, #'0'
+    add     x2, x2, x5
     
-    add     x1, x1, #1
+    add     x3, x3, #1
     b       parse_num_loop
 
 parse_num_done:
     mov     x0, x2              // Return value in x0
-    // x1 already contains bytes consumed
+    mov     x1, x3              // Return bytes consumed in x1
+    
+    ldp     x29, x30, [sp], #16
     ret

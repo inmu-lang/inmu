@@ -79,11 +79,11 @@ parse_let_statement:
     call    skip_whitespace_var
     movq    %rax, %r14
     
-    // Parse number value
+    // Use expression parser to evaluate the right-hand side
     leaq    (%r12,%r14), %rdi
     movq    %r13, %rsi
     subq    %r14, %rsi
-    call    parse_number_simple
+    call    parse_expression_advanced
     
     movq    %rax, %r9           // value
     movq    %rdx, %r10          // bytes consumed
@@ -387,9 +387,10 @@ parse_number_simple:
     xorq    %rax, %rax          // result
     xorq    %rdx, %rdx          // bytes consumed
     xorq    %r8, %r8            // negative flag
+    movq    %rsi, %r9           // save buffer length
     
     // Check for negative sign
-    cmpq    $0, %rsi
+    cmpq    $0, %r9
     jle     parse_num_done
     
     movzbl  (%rdi), %ecx
@@ -400,7 +401,8 @@ parse_number_simple:
     incq    %rdx
     
 parse_num_digits:
-    cmpq    %rsi, %rdx
+    // Check buffer length
+    cmpq    %r9, %rdx
     jge     parse_num_done
     
     movzbl  (%rdi,%rdx), %ecx
