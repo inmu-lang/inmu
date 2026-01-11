@@ -3,8 +3,11 @@
 
 .global _main
 
-// Include print functionality
+// Include functionality
 .include "src/mac/x86_64/include/print.s"
+.include "src/mac/x86_64/include/variables.s"
+.include "src/mac/x86_64/include/control.s"
+.include "src/mac/x86_64/include/expression.s"
 
 // System call numbers for macOS x86_64
 .equ SYS_EXIT,    0x2000001
@@ -27,10 +30,9 @@ usage_len = . - usage_msg
 error_open:     .asciz "Error: Cannot open file\n"
 error_open_len = . - error_open
 
-hello_msg:      .asciz "Hello from INMU!\n"
-hello_len = . - hello_msg
-
 print_keyword:  .asciz "print"
+let_keyword_main: .asciz "let"
+if_keyword_main:  .asciz "if"
 
 .bss
 file_buffer:    .skip 4096
@@ -138,77 +140,139 @@ parse_and_execute:
     pushq   %rbp
     movq    %rsp, %rbp
     
-    xorq    %r14, %r14          // Current search position
+    xorq    %r14, %r14          // Current position
     
 parse_loop:
-    // Look for "print" keyword from current position
-    leaq    (%r12,%r14), %rdi   // buffer + offset
-    movq    %r13, %rax
-    subq    %r14, %rax          // remaining length
-    movq    %rax, %rsi
-    cmpq    $0, %rsi
-    jle     parse_done
+    // Skip whitespace
+    movq    %r12, %rdi
+    movq    %r13, %rsi
+    movq    %r14, %rdx
+    call    skip_whitespace_main
+    movq    %rax, %r14
     
-    leaq    print_keyword(%rip), %rdx
-    movq    $5, %rcx
-    call    find_keyword
+    // Check if we're done
+    cmpq    %r13, %r14
+    jge     parse_done
     
-    cmpq    $0, %rax
-    jl      parse_done          // No more print statements
+    // Save current position
+    movq    %r14, %r15
     
-    // Found print at relative position %rax
-    addq    %r14, %rax          // Absolute position in buffer
-    movq    %rax, %r15
+    // Check for "if"
+    leaq    (%r12,%r14), %rdi
+    leaq    if_keyword_main(%rip), %rsi
+    movq    $2, %rdx
+    call    check_keyword_main
+    
+    cmpq    $1, %rax
+    jne     check_let
+    
+    call    parse_if_statement
+    addq    %rax, %r14
+    jmp     parse_loop
+    
+check_let:
+    // Check for "let"
+    leaq    (%r12,%r14), %rdi
+    leaq    let_keyword_main(%rip), %rsi
+    movq    $3, %rdx
+    call    check_keyword_main
+    
+    cmpq    $1, %rax
+    jne     check_print
+    
+    call    parse_let_statement
+    addq    %rax, %r14
+    jmp     parse_loop
+    
+check_print:
+    // Check for "print"
+    leaq    (%r12,%r14), %rdi
+    leaq    print_keyword(%rip), %rsi
+    movq    $5, %rdx
+    call    check_keyword_main
+    
+    cmpq    $1, %rax
+    jne     skip_unknown
+    
     call    _handle_print
+    addq    %rax, %r14
+    jmp     parse_loop
     
-    // Move past this print statement
-    leaq    1(%r15), %r14
+skip_unknown:
+    // Skip this character
+    incq    %r14
     jmp     parse_loop
     
 parse_done:
     popq    %rbp
     ret
 
-// Find keyword in buffer
-// %rdi = buffer, %rsi = buffer_len, %rdx = keyword, %rcx = keyword_len
-// Returns: position in %rax or -1 if not found
-find_keyword:
+// Check if keyword matches at position
+// %rdi = buffer position, %rsi = keyword, %rdx = keyword length
+// Returns: %rax = 1 if match, 0 if not
+check_keyword_main:
     pushq   %rbp
     movq    %rsp, %rbp
+    pushq   %rbx
     
-    xorq    %r8, %r8            // search position
+    xorq    %rbx, %rbx
     
-find_loop:
-    movq    %rsi, %rax
-    subq    %r8, %rax
-    cmpq    %rcx, %rax
-    jl      not_found
+check_kw_main_loop:
+    cmpq    %rdx, %rbx
+    jge     check_kw_main_match
     
-    // Compare bytes
-    xorq    %r9, %r9
-compare_loop:
-    cmpq    %rcx, %r9
-    jge     found
+    movzbl  (%rdi,%rbx), %eax
+    movzbl  (%rsi,%rbx), %ecx
     
-    leaq    (%rdi,%r8), %r10
-    movzbl  (%r10,%r9), %eax
-    movzbl  (%rdx,%r9), %r11d
-    cmpb    %r11b, %al
-    jne     next_pos
+    cmpb    %cl, %al
+    jne     check_kw_main_no_match
     
-    incq    %r9
-    jmp     compare_loop
+    incq    %rbx
+    jmp     check_kw_main_loop
     
-next_pos:
-    incq    %r8
-    jmp     find_loop
-    
-found:
-    movq    %r8, %rax
+check_kw_main_match:
+    movq    $1, %rax
+    popq    %rbx
     popq    %rbp
     ret
     
-not_found:
-    movq    $-1, %rax
+check_kw_main_no_match:
+    xorq    %rax, %rax
+    popq    %rbx
+    popq    %rbp
+    ret
+
+// Skip whitespace
+// %rdi = buffer, %rsi = length, %rdx = position
+// Returns: %rax = new position
+skip_whitespace_main:
+    pushq   %rbp
+    movq    %rsp, %rbp
+    
+    movq    %rdx, %rax
+    
+skip_ws_main_loop:
+    cmpq    %rsi, %rax
+    jge     skip_ws_main_done
+    
+    leaq    (%rdi,%rax), %rcx
+    movzbl  (%rcx), %ecx
+    
+    cmpb    $' ', %cl
+    je      skip_ws_main_char
+    cmpb    $'\t', %cl
+    je      skip_ws_main_char
+    cmpb    $'\r', %cl
+    je      skip_ws_main_char
+    cmpb    $'\n', %cl
+    je      skip_ws_main_char
+    
+    jmp     skip_ws_main_done
+    
+skip_ws_main_char:
+    incq    %rax
+    jmp     skip_ws_main_loop
+    
+skip_ws_main_done:
     popq    %rbp
     ret

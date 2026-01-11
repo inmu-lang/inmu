@@ -3,6 +3,7 @@
 
 # Executables
 inmu
+inmu_x86_64
 
 # macOS
 .DS_Store

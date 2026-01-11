@@ -1,5 +1,7 @@
 # INMU Programming Language
 
+[![Stage 0 Tests](https://github.com/YOUR_USERNAME/inmu/actions/workflows/test-stage0.yml/badge.svg)](https://github.com/YOUR_USERNAME/inmu/actions/workflows/test-stage0.yml)
+
 ARM64アセンブリで実装され、Rustのようなブートストラップ戦略でセルフホスティングを目指すプログラミング言語です。
 
 ## 🎯 プロジェクトの目標
