@@ -1,0 +1,6 @@
+# Test that should fail with assert_ne
+# assert_neで失敗するべきテスト
+
+print "This test should fail (values are equal):"
+assert_ne(5 + 3, 8)
+print "This line should not be reached"

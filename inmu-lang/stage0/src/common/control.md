@@ -20,16 +20,15 @@ endif
 
 ## 関数詳細
 
-### handle_if
+### parse_if_statement
 **目的**: `if` 文を処理する
 
 **入力**:
-- buffer: テキストバッファ
-- position: "if" の位置
-- length: バッファ長
+- x0 (ARM64) / r15 (x86_64): バッファポインタ（"if"の位置）
+- x1 (ARM64) / - (x86_64): 残りのバッファ長
 
 **出力**:
-- consumed: 消費したバイト数
+- x0 (ARM64) / rax (x86_64): 消費したバイト数
 
 **処理フロー**:
 ```
@@ -69,6 +68,9 @@ endif
 6. return consumed
 ```
 
+**注意**: 実際の実装では、現在の if 文は比較演算子（`==`）をサポートしており、
+`if <left_expr> == <right_expr>` の形式で条件を評価します。
+
 ### execute_until_else_or_endif
 **目的**: `else` または `endif` に到達するまで実行
 
@@ -92,7 +94,7 @@ endif
     b. if match_keyword("if"):
        nest_level++  # 内側の if
        # この if 文を通常通り実行
-       bytes = handle_if(buffer + consumed)
+       bytes = parse_if_statement(buffer + consumed)
        consumed += bytes
        nest_level--
        continue
@@ -178,7 +180,7 @@ endif
     
     b. if match_keyword("if"):
        nest_level++
-       bytes = handle_if(buffer + consumed)
+       bytes = parse_if_statement(buffer + consumed)
        consumed += bytes
        nest_level--
        continue
@@ -246,7 +248,7 @@ endif
 
 処理:
   1. x = 10 を設定
-  2. handle_if() が呼ばれる
+  2. parse_if_statement() が呼ばれる
   3. parse_expression_advanced("x") → 10 (真)
   4. execute_until_else_or_endif() で print 文を実行
   5. endif で終了
@@ -267,7 +269,7 @@ endif
 
 処理:
   1. x = 0 を設定
-  2. handle_if() が呼ばれる
+  2. parse_if_statement() が呼ばれる
   3. parse_expression_advanced("x") → 0 (偽)
   4. skip_until_else_or_endif() で true ブロックをスキップ
   5. else が見つかる
@@ -291,11 +293,11 @@ endif
 
 処理:
   1. x = 10 を設定
-  2. 外側の handle_if() が呼ばれる
+  2. 外側の parse_if_statement() が呼ばれる
   3. parse_expression_advanced("x") → 10 (真)
   4. execute_until_else_or_endif() で内部を実行:
      a. y = 5 を設定
-     b. 内側の handle_if() が呼ばれる (nest_level = 1)
+     b. 内側の parse_if_statement() が呼ばれる (nest_level = 1)
      c. parse_expression_advanced("y") → 5 (真)
      d. print "both non-zero" を実行
      e. 内側の endif
@@ -315,7 +317,7 @@ endif
 
 処理:
   1. x = 10 を設定
-  2. handle_if() が呼ばれる
+  2. parse_if_statement() が呼ばれる
   3. parse_expression_advanced("x + 5")
      → get_variable("x") = 10
      → 10 + 5 = 15 (真)

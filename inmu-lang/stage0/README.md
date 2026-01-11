@@ -14,6 +14,7 @@ Stage 1のコンパイラ（INMU言語で書かれる）を実行できる基盤
 - ✅ **式の評価** - 変数参照、数値リテラル、算術式をサポート
 - ✅ **括弧** - 式の優先順位制御に対応
 - ✅ **制御構造** - `if/else/endif` による条件分岐
+- ✅ **テスト機能** - `assert` による式の検証とテスト
 - ✅ 数値と変数の評価 - 変数の参照と数値リテラル
 - ✅ ファイル読み込み - `.inmu` ファイルの読み込みと実行
 - ✅ コメント対応 - `#` による行コメント
@@ -37,7 +38,8 @@ stage0/
     │   ├── parser.md           # パーサーロジック
     │   ├── expression.md       # 式評価ロジック
     │   ├── variables.md        # 変数管理ロジック
-    │   └── control.md          # 制御構造ロジック
+    │   ├── control.md          # 制御構造ロジック
+    │   └── assert.md           # テスト機能ロジック
     ├── arch/                   # アーキテクチャ固有実装
     │   ├── arm64/              # ARM64実装 (Apple Silicon)
     │   │   ├── main.s
@@ -45,14 +47,16 @@ stage0/
     │   │       ├── print.s       # 出力機能
     │   │       ├── variables.s   # 変数管理
     │   │       ├── expression.s  # 式評価と算術演算
-    │   │       └── control.s     # 制御構造 (if/else)
+    │   │       ├── control.s     # 制御構造 (if/else)
+    │   │       └── assert.s      # テスト機能 (assert)
     │   └── x86_64/             # x86_64実装 (Intel Mac)
     │       ├── main.s
     │       └── include/
     │           ├── print.s
     │           ├── variables.s
     │           ├── expression.s
-    │           └── control.s
+    │           ├── control.s
+    │           └── assert.s
     └── mac/                    # 旧構造（後方互換性のため残存）
 ```
 
@@ -172,10 +176,40 @@ else
 print "x is not 5"
 endif
 ```
-let x = 42
-let y = 100
-let z = 999
+
+#### テスト機能 (assert)
+式を評価して期待値と比較します。テストの自動化に便利です。
+
+```inmu
+# 基本的なアサーション
+assert 10 10              # 成功
+assert 5 + 3 8            # 成功
+
+# 変数のアサーション
+let x = 10
+assert x 10               # 成功
+assert x + 5 15           # 成功
+
+# 失敗例（プログラムが終了します）
+assert 5 + 3 9            # エラー: Assertion failed: expected 9, got 8
 ```
+
+**assert_ne (等しくないことを確認):**
+```inmu
+# 値が等しくないことを確認
+assert_ne 5 10            # 成功
+assert_ne 5 + 3 9         # 成功
+
+let x = 10
+assert_ne x 5             # 成功
+
+# 失敗例（値が等しいのでエラー）
+assert_ne 5 + 3 8         # エラー: Assertion failed: expected NOT 8, but got 8
+```
+
+**動作:**
+- 成功時: 何も出力せず、次の行に進む
+- 失敗時: エラーメッセージを表示してプログラムを終了コード1で終了
 
 #### コメント
 `#`で始まる行はコメントとして無視されます。

@@ -1,0 +1,5 @@
+let a = 5
+let b = 3
+print "Testing a * b"
+assert(a * b, 15)
+print "Test passed!"

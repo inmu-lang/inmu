@@ -44,11 +44,13 @@ NUMBER_BUFFER_SIZE  = 32
 
 ## キーワード
 ```
-KEYWORD_PRINT = "print"
-KEYWORD_LET   = "let"
-KEYWORD_IF    = "if"
-KEYWORD_ELSE  = "else"
-KEYWORD_ENDIF = "endif"
+KEYWORD_PRINT     = "print"
+KEYWORD_LET       = "let"
+KEYWORD_IF        = "if"
+KEYWORD_ELSE      = "else"
+KEYWORD_ENDIF     = "endif"
+KEYWORD_ASSERT    = "assert"
+KEYWORD_ASSERT_NE = "assert_ne"
 ```
 
 ## ASCII コード

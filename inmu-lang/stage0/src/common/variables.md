@@ -14,12 +14,17 @@ variables[MAX_VARIABLES]
   └─ ...
 
 各エントリ:
-  ├─ name[MAX_VAR_NAME_LEN]  # 変数名（null終端文字列）
-  └─ value                    # 変数の値（整数）
+  ├─ name[VAR_NAME_SIZE]  # 変数名（null終端文字列、32バイト）
+  ├─ value                # 変数の値（整数、8バイト）
+  └─ type                 # 変数の型（8バイト、現在未使用）
 
 定数:
   MAX_VARIABLES = 256     # 最大変数数
-  MAX_VAR_NAME_LEN = 32   # 変数名の最大長
+  VAR_NAME_SIZE = 32      # 変数名のサイズ
+  VAR_VALUE_SIZE = 8      # 変数の値のサイズ
+  
+エントリサイズ: 48バイト（32 + 8 + 8）
+総メモリサイズ: 12,288バイト（48 * 256）
 ```
 
 ### グローバル変数
@@ -29,13 +34,12 @@ var_count: 現在登録されている変数の数
 
 ## 関数詳細
 
-### handle_let
+### parse_let_statement
 **目的**: `let` 文を処理して変数を定義する
 
 **入力**:
-- buffer: テキストバッファ
-- position: "let" の位置
-- length: バッファ長
+- x0 (ARM64) / rdi (x86_64): バッファポインタ（"let"の先頭）
+- x1 (ARM64) / rsi (x86_64): 残りのバッファ長
 
 **出力**:
 - consumed: 消費したバイト数
@@ -247,11 +251,11 @@ var_count: 現在登録されている変数の数
 ```assembly
 .bss
 .align 3
-variables:
-    .skip (32 + 8) * 256    # (name[32] + value[8]) * 256変数
-                            # = 40 * 256 = 10,240 bytes
+variable_table:
+    .skip 12288             # (name[32] + value[8] + type[8]) * 256変数
+                            # = 48 * 256 = 12,288 bytes
 
-var_count:
+variable_count:
     .skip 8                 # 8 bytes (64-bit integer)
 ```
 
@@ -260,10 +264,10 @@ var_count:
 ```assembly
 .bss
 .align 8
-variables:
-    .skip (32 + 8) * 256    # (name[32] + value[8]) * 256変数
-                            # = 40 * 256 = 10,240 bytes
+variable_table:
+    .skip 12288             # (name[32] + value[8] + type[8]) * 256変数
+                            # = 48 * 256 = 12,288 bytes
 
-var_count:
+variable_count:
     .skip 8                 # 8 bytes (64-bit integer)
 ```

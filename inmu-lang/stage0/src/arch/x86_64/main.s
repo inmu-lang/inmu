@@ -8,6 +8,7 @@
 .include "src/arch/x86_64/include/variables.s"
 .include "src/arch/x86_64/include/control.s"
 .include "src/arch/x86_64/include/expression.s"
+.include "src/arch/x86_64/include/assert.s"
 
 // System call numbers for macOS x86_64
 .equ SYS_EXIT,    0x2000001
@@ -33,6 +34,8 @@ error_open_len = . - error_open
 print_keyword:  .asciz "print"
 let_keyword_main: .asciz "let"
 if_keyword_main:  .asciz "if"
+assert_keyword_main: .asciz "assert"
+assert_ne_keyword_main: .asciz "assert_ne"
 
 .bss
 file_buffer:    .skip 4096
@@ -170,6 +173,34 @@ parse_loop:
     // call    parse_if_statement
     // addq    %rax, %r14
     // jmp     parse_loop
+    
+check_assert_ne:
+    // Check for "assert_ne" (must check before "assert")
+    leaq    (%r12,%r14), %rdi
+    leaq    assert_ne_keyword_main(%rip), %rsi
+    movq    $9, %rdx
+    call    check_keyword_main
+    
+    cmpq    $1, %rax
+    jne     check_assert
+    
+    call    _handle_assert_ne
+    addq    %rax, %r14
+    jmp     parse_loop
+    
+check_assert:
+    // Check for "assert"
+    leaq    (%r12,%r14), %rdi
+    leaq    assert_keyword_main(%rip), %rsi
+    movq    $6, %rdx
+    call    check_keyword_main
+    
+    cmpq    $1, %rax
+    jne     check_let
+    
+    call    _handle_assert
+    addq    %rax, %r14
+    jmp     parse_loop
     
 check_let:
     // Check for "let"

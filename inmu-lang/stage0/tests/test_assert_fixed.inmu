@@ -1,0 +1,14 @@
+# Test assert function (minimal)
+# Assert機能のテスト（最小版）
+
+print "Assert test"
+
+# Basic
+assert(10, 10)
+assert(5 + 3, 8)
+
+# Variables
+let x = 10
+assert(x, 10)
+
+print "Passed!"

@@ -123,6 +123,10 @@ else
     echo ""
     
     for test in tests/*.inmu; do
+        # Skip tests that are expected to fail (ending with _fail.inmu or _should_fail.inmu)
+        if [[ "$test" =~ _fail\.inmu$ ]] || [[ "$test" =~ _should_fail\.inmu$ ]]; then
+            continue
+        fi
         run_test "$test"
     done
     

@@ -12,6 +12,7 @@
 .include "src/arch/arm64/include/variables.s"
 .include "src/arch/arm64/include/expression.s"
 .include "src/arch/arm64/include/control.s"
+.include "src/arch/arm64/include/assert.s"
 
 // System call numbers for macOS ARM64
 .equ SYS_EXIT,    1
@@ -41,6 +42,8 @@ hello_len = . - hello_msg
 print_keyword:   .asciz "print"
 let_keyword:     .asciz "let"
 if_keyword:      .asciz "if"
+assert_keyword:  .asciz "assert"
+assert_ne_keyword: .asciz "assert_ne"
 
 .bss
 .align 3
@@ -220,6 +223,28 @@ check_keywords:
     // cmp     x0, #1
     // b.eq    found_if
     
+    // Check for "assert_ne" keyword (must check before "assert")
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    adrp    x2, assert_ne_keyword@PAGE
+    add     x2, x2, assert_ne_keyword@PAGEOFF
+    mov     x3, #9
+    bl      check_keyword_at_position
+    
+    cmp     x0, #1
+    b.eq    found_assert_ne
+    
+    // Check for "assert" keyword
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    adrp    x2, assert_keyword@PAGE
+    add     x2, x2, assert_keyword@PAGEOFF
+    mov     x3, #6
+    bl      check_keyword_at_position
+    
+    cmp     x0, #1
+    b.eq    found_assert
+    
     // Check if current position starts with "let" keyword
     add     x0, x19, x23
     sub     x1, x20, x23
@@ -253,6 +278,26 @@ found_if:
     bl      parse_if_statement
     
     // x0 contains bytes consumed
+    add     x23, x23, x0
+    b       parse_loop
+
+found_assert_ne:
+    // Call handle_assert_ne
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    bl      handle_assert_ne
+    
+    // x0 contains bytes consumed (or exits if assertion fails)
+    add     x23, x23, x0
+    b       parse_loop
+
+found_assert:
+    // Call handle_assert
+    add     x0, x19, x23
+    sub     x1, x20, x23
+    bl      handle_assert
+    
+    // x0 contains bytes consumed (or exits if assertion fails)
     add     x23, x23, x0
     b       parse_loop
 

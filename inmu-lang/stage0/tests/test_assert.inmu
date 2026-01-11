@@ -1,0 +1,4 @@
+# Assert test
+assert(10, 10)
+print "Assert test passed"
+
