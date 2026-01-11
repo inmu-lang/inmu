@@ -243,7 +243,7 @@ check_kw_main_no_match:
     popq    %rbp
     ret
 
-// Skip whitespace
+// Skip whitespace and comments
 // %rdi = buffer, %rsi = length, %rdx = position
 // Returns: %rax = new position
 skip_whitespace_main:
@@ -267,11 +267,27 @@ skip_ws_main_loop:
     je      skip_ws_main_char
     cmpb    $'\n', %cl
     je      skip_ws_main_char
+    cmpb    $'#', %cl
+    je      skip_comment_main
     
     jmp     skip_ws_main_done
     
 skip_ws_main_char:
     incq    %rax
+    jmp     skip_ws_main_loop
+
+skip_comment_main:
+    // Skip until newline
+    incq    %rax
+    cmpq    %rsi, %rax
+    jge     skip_ws_main_done
+    
+    leaq    (%rdi,%rax), %rcx
+    movzbl  (%rcx), %ecx
+    cmpb    $'\n', %cl
+    jne     skip_comment_main
+    
+    incq    %rax                // Skip the newline too
     jmp     skip_ws_main_loop
     
 skip_ws_main_done:

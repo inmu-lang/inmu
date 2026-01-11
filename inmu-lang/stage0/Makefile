@@ -23,7 +23,7 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(SOURCE)
-	$(ASM) -o $(TARGET).o $(SOURCE)
+	$(ASM) -arch $(ARCH_FLAG) -o $(TARGET).o $(SOURCE)
 	$(LD) -o $(TARGET) $(TARGET).o -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _main -arch $(ARCH_FLAG)
 
 # Build universal binary (both architectures)

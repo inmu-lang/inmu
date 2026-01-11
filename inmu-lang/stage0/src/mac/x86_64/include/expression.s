@@ -490,9 +490,8 @@ var_name_done_x86:
     // Null terminate
     movb    $0, (%r14,%r15)
     
-    // Get variable value
+    // Get variable value (only name pointer needed)
     movq    %r14, %rdi
-    movq    %r15, %rsi
     call    get_variable
     
     movq    %rax, %rbx          // Save value

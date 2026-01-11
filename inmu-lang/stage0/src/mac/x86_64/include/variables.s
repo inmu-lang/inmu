@@ -27,12 +27,23 @@ parse_let_statement:
     pushq   %rbp
     movq    %rsp, %rbp
     pushq   %rbx
+    pushq   %r12
+    pushq   %r13
     pushq   %r14
+    pushq   %r15
+    subq    $64, %rsp           // Allocate 64 bytes for variable name buffer
+    
+    // %r12 = buffer pointer (preserved)
+    // %r13 = buffer length (preserved)
+    // %r14 = current position
+    // %r15 = saved original position for return value
+    
+    movq    %r15, %rbx          // Save original position
     
     // Skip "let" keyword (3 bytes)
     leaq    3(%r15), %r14
     
-    // Skip whitespace
+    // Skip whitespace after "let"
     movq    %r12, %rdi
     movq    %r13, %rsi
     movq    %r14, %rdx
@@ -41,22 +52,55 @@ parse_let_statement:
     
     // Check bounds
     cmpq    %r13, %r14
-    jge     let_done
+    jge     let_parse_error
     
-    // Parse variable name
-    leaq    (%r12,%r14), %rdi
-    movq    %r13, %rsi
-    subq    %r14, %rsi
-    call    parse_var_name
+    // Extract variable name to stack buffer
+    leaq    -64(%rbp), %r15     // r15 = name buffer on stack
+    xorq    %rcx, %rcx          // rcx = name length counter
     
-    cmpq    $0, %rax
-    jle     let_done
+extract_var_name_let:
+    cmpq    %r13, %r14
+    jge     var_name_extracted
+    cmpq    $31, %rcx           // Max name length
+    jge     var_name_extracted
     
-    movq    %rax, %rbx          // name length
-    leaq    (%r12,%r14), %r8    // name pointer
-    addq    %rax, %r14
+    movzbl  (%r12,%r14), %eax
     
-    // Skip whitespace
+    // Check if alphanumeric or underscore
+    cmpb    $'_', %al
+    je      valid_var_char_let
+    cmpb    $'a', %al
+    jl      check_upper_let
+    cmpb    $'z', %al
+    jle     valid_var_char_let
+    
+check_upper_let:
+    cmpb    $'A', %al
+    jl      check_digit_let
+    cmpb    $'Z', %al
+    jle     valid_var_char_let
+    
+check_digit_let:
+    cmpb    $'0', %al
+    jl      var_name_extracted
+    cmpb    $'9', %al
+    jg      var_name_extracted
+    
+valid_var_char_let:
+    movb    %al, (%r15,%rcx)
+    incq    %rcx
+    incq    %r14
+    jmp     extract_var_name_let
+    
+var_name_extracted:
+    // Null-terminate
+    movb    $0, (%r15,%rcx)
+    
+    // Check if we got a name
+    cmpq    $0, %rcx
+    je      let_parse_error
+    
+    // Skip whitespace before '='
     movq    %r12, %rdi
     movq    %r13, %rsi
     movq    %r14, %rdx
@@ -65,40 +109,54 @@ parse_let_statement:
     
     // Check for '='
     cmpq    %r13, %r14
-    jge     let_done
-    leaq    (%r12,%r14), %rdi
-    movzbl  (%rdi), %eax
+    jge     let_parse_error
+    movzbl  (%r12,%r14), %eax
     cmpb    $'=', %al
-    jne     let_done
+    jne     let_parse_error
     incq    %r14
     
-    // Skip whitespace
+    // Skip whitespace after '='
     movq    %r12, %rdi
     movq    %r13, %rsi
     movq    %r14, %rdx
     call    skip_whitespace_var
     movq    %rax, %r14
     
-    // Use expression parser to evaluate the right-hand side
+    // Parse expression
     leaq    (%r12,%r14), %rdi
     movq    %r13, %rsi
     subq    %r14, %rsi
     call    parse_expression_advanced
     
-    movq    %rax, %r9           // value
-    movq    %rdx, %r10          // bytes consumed
-    addq    %r10, %r14
+    // rax = value, rdx = bytes consumed
+    pushq   %rax                // Save value
+    addq    %rdx, %r14          // Update position
     
-    // Store variable
-    movq    %r8, %rdi           // name pointer
-    movq    %rbx, %rsi          // name length
-    movq    %r9, %rdx           // value
+    // Set variable: name pointer in r15, value in stack
+    movq    %r15, %rdi          // name pointer (null-terminated)
+    popq    %rsi                // value (in rsi, not rdx)
     call    set_variable
     
-let_done:
+    // Calculate bytes consumed
     movq    %r14, %rax
-    subq    %r15, %rax
+    subq    %rbx, %rax
+    
+    addq    $64, %rsp           // Clean up name buffer
+    popq    %r15
     popq    %r14
+    popq    %r13
+    popq    %r12
+    popq    %rbx
+    popq    %rbp
+    ret
+    
+let_parse_error:
+    xorq    %rax, %rax          // Return 0 bytes consumed
+    addq    $64, %rsp
+    popq    %r15
+    popq    %r14
+    popq    %r13
+    popq    %r12
     popq    %rbx
     popq    %rbp
     ret
@@ -152,7 +210,8 @@ parse_var_done:
     ret
 
 // Set variable
-// %rdi = name pointer, %rsi = name length, %rdx = value
+// %rdi = name pointer (null-terminated string)
+// %rsi = value
 set_variable:
     pushq   %rbp
     movq    %rsp, %rbp
@@ -163,8 +222,17 @@ set_variable:
     pushq   %r15
     
     movq    %rdi, %r12          // name pointer
-    movq    %rsi, %r13          // name length
-    movq    %rdx, %r14          // value
+    movq    %rsi, %r14          // value
+    
+    // Get name length
+    xorq    %r13, %r13
+get_name_len:
+    movzbl  (%r12,%r13), %eax
+    cmpb    $0, %al
+    je      name_len_done
+    incq    %r13
+    jmp     get_name_len
+name_len_done:
     
     // Check if name length is valid
     cmpq    $0, %r13
@@ -188,7 +256,6 @@ search_var_loop:
     
     movq    %rdi, %rsi
     movq    %r12, %rdi
-    movq    %r13, %rdx
     call    compare_var_name
     
     cmpq    $1, %rax
@@ -203,38 +270,45 @@ add_new_var:
     cmpq    $MAX_VARIABLES, %rax
     jge     set_var_done
     
-    // Add new variable
+    // Calculate storage offset: variable_count * 40
+    movq    variable_count(%rip), %rax
+    movq    $40, %rcx
+    mulq    %rcx                // Result in rax
     leaq    variable_storage(%rip), %rdi
-    movq    $40, %rax
-    mulq    variable_count(%rip)
-    addq    %rax, %rdi
+    addq    %rax, %rdi          // %rdi = dest (storage location)
     
-    // Copy name
-    movq    %rdi, %rsi
-    movq    %r12, %rdi
-    movq    %r13, %rcx
-    rep movsb
+    // Copy name byte by byte (max 31 chars + null)
+    xorq    %rcx, %rcx          // Counter
+copy_name_byte_loop:
+    cmpq    $31, %rcx
+    jge     copy_name_byte_done
+    movzbl  (%r12,%rcx), %eax
+    movb    %al, (%rdi,%rcx)
+    cmpb    $0, %al             // Check for null terminator
+    je      copy_name_byte_done
+    incq    %rcx
+    jmp     copy_name_byte_loop
     
-    // Store value
-    leaq    variable_storage(%rip), %rdi
-    movq    $40, %rax
-    mulq    variable_count(%rip)
-    addq    $32, %rax
-    addq    %rax, %rdi
-    movq    %r14, (%rdi)
+copy_name_byte_done:
+    // Null-terminate
+    movb    $0, (%rdi,%rcx)
+    
+    // Store value at offset 32
+    movq    %r14, 32(%rdi)
     
     // Increment count
     incq    variable_count(%rip)
     jmp     set_var_done
     
 update_var:
-    // Update existing variable
+    // Update existing variable at index r15
+    movq    %r15, %rax
+    movq    $40, %rcx
+    mulq    %rcx                // offset = index * 40
     leaq    variable_storage(%rip), %rdi
-    movq    $40, %rax
-    mulq    %r15
-    addq    $32, %rax
     addq    %rax, %rdi
-    movq    %r14, (%rdi)
+    movq    %r14, 32(%rdi)      // Store value at offset 32
+    jmp     set_var_done
     
 set_var_done:
     popq    %r15
@@ -246,7 +320,7 @@ set_var_done:
     ret
 
 // Compare variable name
-// %rdi = name1, %rsi = storage slot, %rdx = name1 length
+// %rdi = name1 (null-terminated), %rsi = storage slot
 // Returns: %rax = 1 if match, 0 if not
 compare_var_name:
     pushq   %rbp
@@ -255,11 +329,12 @@ compare_var_name:
     xorq    %rcx, %rcx
     
 compare_var_loop:
-    cmpq    %rdx, %rcx
-    jge     compare_var_match
-    
     movzbl  (%rdi,%rcx), %eax
     movzbl  (%rsi,%rcx), %r8d
+    
+    // Check for null terminator in name1
+    cmpb    $0, %al
+    je      compare_var_check_end
     
     cmpb    %r8b, %al
     jne     compare_var_no_match
@@ -267,12 +342,10 @@ compare_var_loop:
     incq    %rcx
     jmp     compare_var_loop
     
-compare_var_match:
-    // Check if storage name ends here (null byte)
-    movzbl  (%rsi,%rcx), %eax
-    cmpb    $0, %al
+compare_var_check_end:
+    // Both should end here
+    cmpb    $0, %r8b
     jne     compare_var_no_match
-    
     movq    $1, %rax
     popq    %rbp
     ret
@@ -283,8 +356,8 @@ compare_var_no_match:
     ret
 
 // Get variable value
-// %rdi = name pointer, %rsi = name length
-// Returns: %rax = value, %rdx = 1 if found, 0 if not
+// %rdi = name pointer (null-terminated string)
+// Returns: %rax = value (0 if not found)
 get_variable:
     pushq   %rbp
     movq    %rsp, %rbp
@@ -293,7 +366,16 @@ get_variable:
     pushq   %r13
     
     movq    %rdi, %r12
-    movq    %rsi, %r13
+    
+    // Get name length
+    xorq    %r13, %r13
+get_var_name_len:
+    movzbl  (%r12,%r13), %eax
+    cmpb    $0, %al
+    je      get_var_name_len_done
+    incq    %r13
+    jmp     get_var_name_len
+get_var_name_len_done:
     
     xorq    %rbx, %rbx          // index
     
@@ -310,7 +392,6 @@ get_var_loop:
     
     movq    %rdi, %rsi
     movq    %r12, %rdi
-    movq    %r13, %rdx
     call    compare_var_name
     
     cmpq    $1, %rax
@@ -325,8 +406,7 @@ get_var_found:
     mulq    %rbx
     addq    $32, %rax
     addq    %rax, %rdi
-    movq    (%rdi), %rax
-    movq    $1, %rdx
+    movq    (%rdi), %rax        // Return value
     popq    %r13
     popq    %r12
     popq    %rbx
@@ -334,8 +414,7 @@ get_var_found:
     ret
     
 get_var_not_found:
-    xorq    %rax, %rax
-    xorq    %rdx, %rdx
+    xorq    %rax, %rax          // Return 0
     popq    %r13
     popq    %r12
     popq    %rbx
@@ -426,5 +505,64 @@ parse_num_done:
     negq    %rax
     
 parse_num_return:
+    popq    %rbp
+    ret
+
+// Debug helper: print string
+print_string_debug:
+    pushq   %rbp
+    movq    %rsp, %rbp
+    pushq   %rbx
+    pushq   %r12
+    
+    movq    %rdi, %r12
+    xorq    %rbx, %rbx
+psd_len_loop:
+    movzbl  (%r12,%rbx), %eax
+    cmpb    $0, %al
+    je      psd_len_done
+    incq    %rbx
+    jmp     psd_len_loop
+psd_len_done:
+    movq    $0x2000004, %rax    // SYS_WRITE
+    movq    $1, %rdi            // STDOUT
+    movq    %r12, %rsi
+    movq    %rbx, %rdx
+    syscall
+    
+    popq    %r12
+    popq    %rbx
+    popq    %rbp
+    ret
+
+// Debug helper: print number
+print_number_debug:
+    pushq   %rbp
+    movq    %rsp, %rbp
+    subq    $32, %rsp
+    pushq   %rbx
+    pushq   %r12
+    
+    movq    %rdi, %rax
+    leaq    -32(%rbp), %r12
+    addq    $20, %r12
+    movb    $0, (%r12)
+    
+pnd_loop:
+    xorq    %rdx, %rdx
+    movq    $10, %rcx
+    divq    %rcx
+    addb    $'0', %dl
+    decq    %r12
+    movb    %dl, (%r12)
+    cmpq    $0, %rax
+    jne     pnd_loop
+    
+    movq    %r12, %rdi
+    call    print_string_debug
+    
+    popq    %r12
+    popq    %rbx
+    addq    $32, %rsp
     popq    %rbp
     ret
