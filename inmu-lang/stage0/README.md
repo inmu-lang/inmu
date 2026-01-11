@@ -30,22 +30,41 @@ stage0/
 ├── inmu               # コンパイル済みバイナリ
 ├── run_tests.sh       # テストスクリプト
 └── src/
-    └── mac/
-        ├── arm64/              # ARM64実装 (Apple Silicon)
-        │   ├── main.s
-        │   └── include/
-        │       ├── print.s       # 出力機能
-        │       ├── variables.s   # 変数管理
-        │       ├── expression.s  # 式評価と算術演算
-        │       └── control.s     # 制御構造 (if/else)
-        └── x86_64/             # x86_64実装 (Intel Mac)
-            ├── main.s
-            └── include/
-                ├── print.s
-                ├── variables.s
-                ├── expression.s
-                └── control.s
+    ├── common/                 # 共通ロジック（ドキュメント）
+    │   ├── README.md           # 共通化の説明
+    │   ├── algorithm.md        # 全体アルゴリズム
+    │   ├── constants.md        # 定数定義
+    │   ├── parser.md           # パーサーロジック
+    │   ├── expression.md       # 式評価ロジック
+    │   ├── variables.md        # 変数管理ロジック
+    │   └── control.md          # 制御構造ロジック
+    ├── arch/                   # アーキテクチャ固有実装
+    │   ├── arm64/              # ARM64実装 (Apple Silicon)
+    │   │   ├── main.s
+    │   │   └── include/
+    │   │       ├── print.s       # 出力機能
+    │   │       ├── variables.s   # 変数管理
+    │   │       ├── expression.s  # 式評価と算術演算
+    │   │       └── control.s     # 制御構造 (if/else)
+    │   └── x86_64/             # x86_64実装 (Intel Mac)
+    │       ├── main.s
+    │       └── include/
+    │           ├── print.s
+    │           ├── variables.s
+    │           ├── expression.s
+    │           └── control.s
+    └── mac/                    # 旧構造（後方互換性のため残存）
 ```
+
+## アーキテクチャ設計
+
+### 共通化戦略
+
+1. **ロジックの文書化**: `src/common/` 配下に各モジュールのアルゴリズムを Markdown で文書化
+2. **アーキテクチャ固有実装**: `src/arch/{ARCH}/` に ARM64 と x86_64 の実装を分離
+3. **インターフェース統一**: 両アーキテクチャで同じ関数名とデータ構造を使用
+
+詳細は [src/common/README.md](src/common/README.md) を参照してください。
 
 ## 🔨 ビルド方法
 
