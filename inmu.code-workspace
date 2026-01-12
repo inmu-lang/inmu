@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "path": "./vscode-inmu",
+      "name": "vscode-inmu"
+    },
+    {
+      "path": "./inmu-lang",
+      "name": "inmu-lang"
+    },
+    {
+      "path": "./",
+      "name": "root"
+    }
+  ]
+}

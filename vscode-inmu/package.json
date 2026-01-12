@@ -1,0 +1,74 @@
+{
+  "name": "inmu-language",
+  "icon": "icon.png",
+  "displayName": "INMU Language Support",
+  "description": "Language support for INMU programming language with LSP features",
+  "version": "0.1.0",
+  "publisher": "inmu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inmu-lang/inmu.git",
+    "directory": "vscode-inmu"
+  },
+  "engines": {
+    "vscode": "^1.108.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "inmu",
+    "language",
+    "syntax",
+    "lsp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "inmu",
+        "aliases": [
+          "INMU",
+          "inmu"
+        ],
+        "extensions": [
+          ".inmu"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark": "./icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "inmu",
+        "scopeName": "source.inmu",
+        "path": "./syntaxes/inmu.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "inmu.runFile",
+        "title": "INMU: Run Current File"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.6",
+    "@types/vscode": "^1.108.0",
+    "typescript": "^5.9.3"
+  }
+}
