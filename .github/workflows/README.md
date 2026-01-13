@@ -43,6 +43,8 @@
 **実行内容**:
 - Linux (x86_64) 用バイナリのビルドとリリース
 - Windows (x86_64) 用バイナリのビルドとリリース
+- macOS (ARM64/x86_64) 用バイナリのビルドとリリース
+- **VS Code拡張機能 (.vsix) のビルドとリリース**
 
 ## ビルド成果物
 
@@ -52,12 +54,18 @@
 - `inmu-macos-x86_64.tar.gz` - macOS Intel版
 - `inmu-linux-x86_64.tar.gz` - Linux x86_64版
 - `inmu-windows-x86_64.zip` - Windows x86_64版
+- `inmu-language-x.x.x.vsix` - VS Code拡張機能
 
 各アーカイブには以下が含まれます：
 - `inmu` 実行可能ファイル（Windowsは`inmu.exe`）
 - `README.md` - プロジェクト説明
+- `Makefile` - ビルドツール
 - `examples/` - サンプルプログラム
 - `docs/` - ドキュメント
+
+VS Code拡張機能（.vsix）は：
+- VS Codeで直接インストール可能
+- シンタックスハイライト、LSP機能、実行サポートを含む
 
 ## キャッシュ戦略
 
@@ -127,6 +135,16 @@ cargo build --release
    - 全プラットフォーム向けビルドを実行
    - テストを実行
    - バイナリをリリースに添付
+   - **VS Code拡張機能 (.vsix) もリリースに添付**
+
+## VS Code拡張機能のインストール
+
+リリースからダウンロードした.vsixファイルをインストールする方法：
+
+1. VS Codeを開く
+2. 拡張機能ビュー（Ctrl+Shift+X / Cmd+Shift+X）を開く
+3. 「…」メニュー → 「VSIXからのインストール...」
+4. ダウンロードした.vsixファイルを選択
 
 ## トラブルシューティング
 

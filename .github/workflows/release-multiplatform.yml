@@ -120,3 +120,48 @@ jobs:
           asset_path: ./inmu-lang/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
           asset_content_type: ${{ runner.os == 'Windows' && 'application/zip' || 'application/gzip' }}
+
+  build-vscode-extension:
+    name: Build and Upload VS Code Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+      
+      - name: Install dependencies
+        working-directory: vscode-inmu
+        run: npm install
+      
+      - name: Compile extension
+        working-directory: vscode-inmu
+        run: npm run compile
+      
+      - name: Package extension
+        working-directory: vscode-inmu
+        run: vsce package
+      
+      - name: Get extension filename
+        id: get_vsix
+        working-directory: vscode-inmu
+        run: echo "vsix_file=$(ls *.vsix)" >> $GITHUB_OUTPUT
+      
+      - name: Upload VS Code Extension
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./vscode-inmu/${{ steps.get_vsix.outputs.vsix_file }}
+          asset_name: ${{ steps.get_vsix.outputs.vsix_file }}
+          asset_content_type: application/octet-stream
