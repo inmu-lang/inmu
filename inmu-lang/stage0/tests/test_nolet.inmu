@@ -1,2 +1,0 @@
-# Test without let - should get 0
-print x

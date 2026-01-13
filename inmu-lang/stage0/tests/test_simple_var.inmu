@@ -1,4 +1,0 @@
-# Test simple number
-print 5
-let x = 10
-print x

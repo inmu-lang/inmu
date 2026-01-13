@@ -1,0 +1,122 @@
+name: Release Multi-Platform
+
+on:
+  release:
+    types: [published, released, prereleased]
+
+jobs:
+  build-and-upload:
+    name: Build and Upload Release Assets
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: inmu-macos-arm64.tar.gz
+            asset_name: inmu-macos-arm64.tar.gz
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact_name: inmu-macos-x86_64.tar.gz
+            asset_name: inmu-macos-x86_64.tar.gz
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: inmu-linux-x86_64.tar.gz
+            asset_name: inmu-linux-x86_64.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: inmu-windows-x86_64.zip
+            asset_name: inmu-windows-x86_64.zip
+    
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install Make (Windows)
+        if: runner.os == 'Windows'
+        run: choco install make -y
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache target directory
+        uses: actions/cache@v3
+        with:
+          path: inmu-lang/stage0/target
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Build binary
+        working-directory: inmu-lang
+        run: make stage0
+      
+      - name: Run unit tests
+        working-directory: inmu-lang/stage0
+        run: cargo test
+      
+      - name: Run integration tests
+        working-directory: inmu-lang
+        run: make test
+      
+      - name: Create archive (Linux)
+        if: runner.os == 'Linux'
+        working-directory: inmu-lang
+        run: |
+          mkdir -p release
+          cp inmu release/
+          cp README.md release/
+          cp Makefile release/
+          cp -r examples release/
+          cp -r docs release/
+          tar -czf ${{ matrix.artifact_name }} -C release .
+      
+      - name: Create archive (macOS)
+        if: runner.os == 'macOS'
+        working-directory: inmu-lang
+        run: |
+          mkdir -p release
+          cp inmu release/
+          cp README.md release/
+          cp Makefile release/
+          cp -r examples release/
+          cp -r docs release/
+          tar -czf ${{ matrix.artifact_name }} -C release .
+      
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        working-directory: inmu-lang
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item inmu.exe release/
+          Copy-Item README.md release/
+          Copy-Item Makefile release/
+          Copy-Item -Recurse examples release/
+          Copy-Item -Recurse docs release/
+          Compress-Archive -Path release/* -DestinationPath ${{ matrix.artifact_name }}
+      
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./inmu-lang/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: ${{ runner.os == 'Windows' && 'application/zip' || 'application/gzip' }}

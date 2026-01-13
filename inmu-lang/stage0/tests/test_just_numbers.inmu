@@ -1,5 +1,0 @@
-# Debug: just numbers, no operations
-print "Testing numbers only"
-print 10
-print 20
-print "Done"

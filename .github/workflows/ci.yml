@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Make (Windows)
+        if: runner.os == 'Windows'
+        run: choco install make -y
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache target directory
+        uses: actions/cache@v3
+        with:
+          path: inmu-lang/stage0/target
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Check formatting
+        working-directory: inmu-lang
+        run: make fmt
+      
+      - name: Run clippy
+        working-directory: inmu-lang
+        run: make lint
+      
+      - name: Check code
+        working-directory: inmu-lang
+        run: make check
+      
+      - name: Build
+        working-directory: inmu-lang
+        run: make stage0
+      
+      - name: Run unit tests
+        working-directory: inmu-lang/stage0
+        run: cargo test --verbose
+      
+      - name: Run integration tests
+        working-directory: inmu-lang
+        run: make test
+
+  build-release:
+    name: Build Release Binary
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: inmu-linux-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: inmu-macos-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact_name: inmu-macos-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: inmu-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Build release binary
+        working-directory: inmu-lang/stage0
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: inmu-lang/stage0/target/${{ matrix.target }}/release/inmu
+      
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: inmu-lang/stage0/target/${{ matrix.target }}/release/inmu.exe

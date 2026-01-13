@@ -1,6 +1,0 @@
-# Test that should fail with assert
-# assertで失敗するべきテスト
-
-print "This test should fail (values are not equal):"
-assert(5 + 3, 9)
-print "This line should not be reached"

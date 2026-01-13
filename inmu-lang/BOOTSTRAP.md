@@ -6,16 +6,27 @@ INMU言語をRustのようにブートストラップ/セルフホスティン�
 
 ## ブートストラップフェーズ
 
-### Stage 0: アセンブリインタプリタ (現在)
-**実装言語**: ARM64/x86_64 アセンブリ  
+### Stage 0: Rustインタプリタ (現在)
+**実装言語**: Rust  
 **状態**: 基本機能実装済み  
 **実装済み機能**:
-- ✅ `print` コマンド（文字列と変数）
-- ✅ 変数宣言 (`let x = 42`)
+- ✅ `print` コマンド（文字列と数値）
+- ✅ 変数宣言と代入 (`let x = 42`)
 - ✅ 変数の参照
+- ✅ 算術演算子 (`+`, `-`, `*`, `/`)
+- ✅ 比較演算子 (`==`)
+- ✅ 式の評価（括弧、演算子の優先順位）
+- ✅ 条件分岐 (`if/else/endif`)
+- ✅ アサーション (`assert`, `assert_ne`)
+- ✅ コメント対応 (`//`, `/* */`)
 - ✅ ファイル読み込み
-- ✅ コメント対応 (`#`)
-- ✅ 基本的なパーサー
+- ✅ トークナイザーとパーサー
+
+**Rust実装の利点**:
+- クロスプラットフォーム（macOS、Linux、Windows）
+- メモリ安全性
+- 高速な開発とデバッグ
+- 豊富なツールチェーン（cargo、rustfmt、clippy）
 
 **役割**: Stage 1コンパイラを実行できるようにする
 
@@ -98,16 +109,15 @@ inmu-lang/
 ├── BOOTSTRAP.md           # このファイル
 ├── Makefile
 │
-├── stage0/                # アセンブリインタプリタ
+├── stage0/                # Rustインタプリタ
+│   ├── Cargo.toml
 │   ├── src/
-│   │   ├── mac/
-│   │   │   ├── arm64/
-│   │   │   │   └── main.s
-│   │   │   └── x86_64/
-│   │   │       └── main.s
-│   │   └── ...
-│   ├── Makefile
-│   └── tests/
+│   │   ├── main.rs        # エントリーポイント
+│   │   ├── token.rs       # トークナイザー
+│   │   ├── ast.rs         # AST定義
+│   │   ├── parser.rs      # パーサー
+│   │   └── interpreter.rs # インタプリタ
+│   └── target/            # ビルド成果物
 │
 ├── stage1/                # ミニマルコンパイラ (INMU言語で実装)
 │   ├── compiler/
@@ -133,13 +143,14 @@ inmu-lang/
 │
 ├── examples/              # サンプルコード
 │   ├── hello.inmu
-│   ├── fibonacci.inmu
+│   ├── arithmetic.inmu
+│   ├── variables.inmu
 │   └── ...
 │
 └── docs/                  # ドキュメント
     ├── language-spec.md
     ├── compiler-design.md
-    └── stdlib-api.md
+    └── verification-guide.md
 ```
 
 ---

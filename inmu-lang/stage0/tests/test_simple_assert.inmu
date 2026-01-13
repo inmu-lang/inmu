@@ -1,7 +1,0 @@
-# Simple assert test
-print "Starting simple test..."
-assert(10, 10)
-print "Test 1 passed"
-assert(5 + 3, 8)
-print "Test 2 passed"
-print "All simple tests passed!"

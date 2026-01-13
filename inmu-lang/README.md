@@ -7,17 +7,17 @@ ARM64アセンブリで実装され、Rustのようなブートストラップ�
 ## 🎯 プロジェクトの目標
 
 - **セルフホスティング**: INMU言語で書かれたコンパイラが自分自身をコンパイルできる
-- **Pure Assembly Bootstrap**: Stage 0はCやRustを使わず、純粋なアセンブリで実装
+- **クロスプラットフォーム**: Rust実装により、Windows/macOS/Linux全てで動作
 - **教育的価値**: コンパイラとブートストラップの仕組みを学べる
 
 ## 📚 ブートストラップ戦略
 
 詳細は [BOOTSTRAP.md](BOOTSTRAP.md) を参照してください。
 
-### Stage 0: アセンブリインタプリタ ✅ (現在)
-- **実装**: ARM64/x86_64 アセンブリ
+### Stage 0: Rustインタプリタ ✅ (現在)
+- **実装**: Rust
 - **役割**: Stage 1コンパイラを実行できる基盤
-- **状態**: 基本機能実装済み
+- **状態**: 基本機能実装済み（クロスプラットフォーム対応）
 
 ### Stage 1: セルフホストコンパイラ 🚧 (待機中)
 - **実装**: INMU言語（実装完了）
@@ -35,21 +35,45 @@ ARM64アセンブリで実装され、Rustのようなブートストラップ�
 
 ## 🚀 クイックスタート
 
+### 必要な環境
+
+- Rust (1.70以降)
+- make (Unix系) または PowerShell (Windows)
+
 ### ビルド方法
 
+**Unix系 (macOS/Linux):**
 ```bash
 # Stage 0インタプリタをビルド
 make
 
-# または特定のステージを指定
-make stage0
+# または直接cargo
+cd stage0 && cargo build --release
+```
+
+**Windows (PowerShell):**
+```powershell
+# makeがある場合
+make
+
+# または直接cargo
+cd stage0
+cargo build --release
+Copy-Item target/release/inmu.exe ../inmu.exe
 ```
 
 ### 使い方
 
+**Unix系:**
 ```bash
 # サンプルプログラムを実行
 ./inmu examples/hello.inmu
+```
+
+**Windows:**
+```powershell
+# サンプルプログラムを実行
+.\inmu.exe examples\hello.inmu
 ```
 
 ### サンプルコード
@@ -70,11 +94,14 @@ print "Welcome to Assembly!"
 
 ```
 inmu-lang/
-├── stage0/          # アセンブリインタプリタ
+├── stage0/          # Rustインタプリタ
+│   ├── Cargo.toml
 │   └── src/
-│       └── mac/
-│           ├── arm64/
-│           └── x86_64/
+│       ├── main.rs
+│       ├── token.rs
+│       ├── ast.rs
+│       ├── parser.rs
+│       └── interpreter.rs
 ├── stage1/          # セルフホストコンパイラ (INMU言語)
 │   ├── compiler/
 │   ├── runtime/
@@ -82,21 +109,23 @@ inmu-lang/
 ├── stage2/          # 検証用
 ├── stage3/          # 最適化版
 ├── examples/        # サンプルコード
-└── docs/            # ドキュメント
+├── docs/            # ドキュメント
+└── Makefile         # クロスプラットフォームビルド
 ```
 
 ## 🔧 開発状況
 
-### 現在実装済み (Stage 0)
-- [x] 基本的な `print` コマンド（文字列、変数、式）
-- [x] 変数システム（`let` で宣言、最大256変数）
+### 現在実装済み (Stage 0 - Rust版)
+- [x] 基本的な `print` コマンド（文字列、数値、式）
+- [x] 変数システム（`let` で宣言）
 - [x] **算術演算** (`+`, `-`, `*`, `/`) と括弧のサポート
+- [x] **比較演算** (`==`)
 - [x] **式の評価** - 変数参照、数値リテラル、複雑な算術式
 - [x] **制御構造** - `if/else/endif` による条件分岐
-- [x] 変数の参照と表示
-- [x] コメント対応 (`#`)
+- [x] **アサーション** - `assert`, `assert_ne`
+- [x] コメント対応 (`//`, `/* */`)
 - [x] ファイル読み込み
-- [x] ARM64/x86_64サポート
+- [x] **クロスプラットフォーム** - Windows/macOS/Linux対応
 
 ### 次の実装予定 (Stage 1コンパイラに必要)
 - [ ] **配列操作** - リスト作成、インデックスアクセス、push/pop/len

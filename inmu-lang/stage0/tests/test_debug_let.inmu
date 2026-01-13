@@ -1,4 +1,0 @@
-# Debug let statement
-print 15
-let a = 15
-print a

@@ -106,8 +106,8 @@ connection.onInitialized(() => {
 
 // ドキュメント変更時に診断を実行
 documents.onDidChangeContent(change => {
-  validateTextDocument(change.document);
   updateSymbolTable(change.document);
+  validateTextDocument(change.document);
 });
 
 // シンボルテーブルの更新
@@ -273,38 +273,71 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
       diagnostics.push(diagnostic);
     }
 
-    // if文にendifがあるかチェック（簡易版）
+    // if文の構文チェック（ブロック形式とendif形式の両方をサポート）
     if (trimmed.startsWith('if ') && !trimmed.includes('{')) {
-      const diagnostic: Diagnostic = {
-        severity: DiagnosticSeverity.Warning,
-        range: {
-          start: { line: i, character: 0 },
-          end: { line: i, character: line.length }
-        },
-        message: `if文にはブロック '{' が必要です`,
-        source: 'inmu'
-      };
-      diagnostics.push(diagnostic);
-    }
-
-    // 未定義の変数の使用を検出（簡易版）
-    const varUsageMatch = line.match(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*[+\-*\/=]/);
-    if (varUsageMatch) {
-      const varName = varUsageMatch[1];
-      // キーワードや組み込み関数でない場合
-      const keywords = ['let', 'if', 'else', 'while', 'for', 'fn', 'return', 'print', 'assert', 'assert_ne', 'debug', 'trace', 'true', 'false'];
-      if (!keywords.includes(varName) && !symbolTable.has(varName)) {
-        const varIndex = line.indexOf(varName);
+      // endif形式かどうかをチェック
+      let hasEndif = false;
+      for (let j = i + 1; j < lines.length; j++) {
+        const futureLine = lines[j].trim();
+        if (futureLine === 'endif') {
+          hasEndif = true;
+          break;
+        }
+        // 次のif文や他のブロックが始まったら探索終了
+        if (futureLine.startsWith('if ') || futureLine.startsWith('fn ')) {
+          break;
+        }
+      }
+      
+      // endifがない場合のみ警告
+      if (!hasEndif) {
         const diagnostic: Diagnostic = {
           severity: DiagnosticSeverity.Warning,
           range: {
-            start: { line: i, character: varIndex },
-            end: { line: i, character: varIndex + varName.length }
+            start: { line: i, character: 0 },
+            end: { line: i, character: line.length }
           },
-          message: `変数 '${varName}' が定義されていない可能性があります`,
+          message: `if文にはブロック '{' または 'endif' が必要です`,
           source: 'inmu'
         };
         diagnostics.push(diagnostic);
+      }
+    }
+
+    // 未定義の変数の使用を検出（簡易版）
+    // 変数宣言行はスキップ
+    if (!trimmed.startsWith('let ')) {
+      // 文字列リテラルを一時的に除去してから変数をチェック
+      let lineWithoutStrings = line.replace(/"[^"]*"/g, '""').replace(/'[^']*'/g, "''");
+      
+      // 変数名を抽出
+      const varUsageMatches = lineWithoutStrings.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g);
+      
+      for (const match of varUsageMatches) {
+        const varName = match[1];
+        const varIndex = match.index!;
+        
+        // キーワードや組み込み関数でない場合
+        const keywords = ['let', 'if', 'else', 'elsif', 'endif', 'while', 'endwhile', 'for', 'fn', 'return', 'print', 'assert', 'assert_ne', 'debug', 'trace', 'true', 'false'];
+        
+        if (!keywords.includes(varName)) {
+          // このドキュメント内で定義されているかチェック
+          const symbols = symbolTable.get(varName);
+          const definedInThisFile = symbols?.some(s => s.uri === textDocument.uri);
+          
+          if (!definedInThisFile) {
+            const diagnostic: Diagnostic = {
+              severity: DiagnosticSeverity.Warning,
+              range: {
+                start: { line: i, character: varIndex },
+                end: { line: i, character: varIndex + varName.length }
+              },
+              message: `変数 '${varName}' が定義されていない可能性があります`,
+              source: 'inmu'
+            };
+            diagnostics.push(diagnostic);
+          }
+        }
       }
     }
   }

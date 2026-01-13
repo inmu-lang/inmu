@@ -1,6 +1,6 @@
 # INMU プロジェクト進捗状況
 
-**更新日**: 2026年1月11日
+**更新日**: 2026年1月14日
 
 ## プロジェクト概要
 
@@ -8,46 +8,49 @@ INMU言語は、セルフホスティングを目指すプログラミング言�
 
 ## 現在のステータス
 
-### Stage 0: アセンブリインタプリタ ✅ (完了)
+### Stage 0: Rustインタプリタ ✅ (完了)
 
-**実装言語**: ARM64/x86_64 アセンブリ  
+**実装言語**: Rust  
 **状態**: 基本機能実装済み
 
 #### 完了した機能
-- [x] 基本的な`print`コマンド（文字列と変数）
+- [x] 基本的な`print`コマンド（文字列と数値）
 - [x] 変数宣言と保存 (`let x = 42`)
 - [x] 変数の参照 (`print x`)
 - [x] **算術演算子** (`+`, `-`, `*`, `/`)
+- [x] **比較演算子** (`==`)
 - [x] **式の評価** (変数参照、数値リテラル、算術式)
 - [x] **括弧** (式の優先順位制御)
 - [x] **制御構造** (`if/else/endif` による条件分岐)
-- [x] **比較演算子** (`==` による等価比較)
-- [x] コメント対応 (`#`)
+- [x] **アサーション** (`assert`, `assert_ne`)
+- [x] コメント対応 (`//`, `/* */`)
 - [x] ファイル読み込み
-- [x] 単純なコマンドパーサー
-- [x] 変数管理システム（最大256変数）
-- [x] macOSでのビルドと実行（ARM64/x86_64両対応）
+- [x] トークナイザー（字句解析）
+- [x] パーサー（構文解析）
+- [x] インタプリタ（実行エンジン）
+- [x] クロスプラットフォーム対応（Rust製）
 
 #### ファイル構成
 ```
 stage0/
-├── src/mac/
-│   ├── arm64/              # ARM64実装 (Apple Silicon)
-│   │   ├── main.s
-│   │   └── include/
-│   │       ├── print.s       # 出力機能
-│   │       ├── variables.s   # 変数管理
-│   │       ├── expression.s  # 式評価と算術演算
-│   │       └── control.s     # 制御構造 (if/else)
-│   └── x86_64/             # x86_64実装 (Intel Mac)
-│       ├── main.s
-│       └── include/
-│           ├── print.s
-│           ├── variables.s
-│           ├── expression.s
-│           └── control.s
-└── Makefile
+├── Cargo.toml             # Rustプロジェクト設定
+├── src/
+│   ├── main.rs            # エントリーポイント
+│   ├── token.rs           # トークナイザー（字句解析）
+│   ├── ast.rs             # AST定義
+│   ├── parser.rs          # パーサー（構文解析）
+│   └── interpreter.rs     # インタプリタ（実行エンジン）
+└── target/
+    └── release/
+        └── inmu           # 実行可能バイナリ
 ```
+
+#### Rust実装の利点
+- **クロスプラットフォーム**: macOS、Linux、Windowsで同じコードが動作
+- **メモリ安全性**: Rustコンパイラが安全性を保証
+- **開発効率**: cargo、rustfmt、clippyなどの豊富なツールチェーン
+- **パフォーマンス**: C言語と同等の実行速度
+- **エラー処理**: 詳細なエラーメッセージ
 
 ### Stage 1: ミニマルコンパイラ 🚧 (実装中)
 
@@ -122,18 +125,24 @@ stage0/
 3. ✅ 制御構造（if/else） - 完了
    ```inmu
    if x == 10
-   print "x is 10"
+       print "x is 10"
    else
-   print "x is not 10"
+       print "x is not 10"
    endif
    ```
 
-4. 変数への再代入
+4. ✅ アサーション - 完了
+   ```inmu
+   assert(actual, expected)
+   assert_ne(actual, expected)
+   ```
+
+5. 変数への再代入
    ```inmu
    x = x + 5
    ```
 
-5. 関数定義と呼び出し
+6. 関数定義と呼び出し
    ```inmu
    fn add(a, b) {
        return a + b
@@ -141,26 +150,22 @@ stage0/
    let result = add(10, 20)
    ```
 
-5. 制御構造
+7. ループ構造
    ```inmu
-   if x > 0 { ... } else { ... }
-   while i < 10 { ... }
+   while i < 10 {
+       print i
+       i = i + 1
+   }
    ```
 
-6. 配列操作
+8. 配列操作
    ```inmu
    let arr = [1, 2, 3]
-   arr[0]
+   print arr[0]
    arr.push(4)
    ```
 
-7. 構造体（オブジェクト）
-   ```inmu
-   struct Point { x: int, y: int }
-   let p = Point { x: 10, y: 20 }
-   ```
-
-8. ファイル操作
+9. ファイル操作
    ```inmu
    let content = read_file("input.txt")
    write_file("output.txt", "Hello")
@@ -177,19 +182,26 @@ stage0/
 ## マイルストーン
 
 ### ✅ マイルストーン 0: Stage 0完成 (2026年1月)
-- [x] ARM64アセンブリインタプリタ実装
+- [x] Rustインタプリタ実装
+- [x] トークナイザーとパーサー
 - [x] 基本的なprint機能
+- [x] 変数システム
+- [x] 式の評価と算術演算
+- [x] 条件分岐（if/else/endif）
+- [x] アサーション
 
 ### 🚧 マイルストーン 1: Stage 0機能拡張 (目標: 2026年3月)
 - [x] 変数システム実装
 - [x] 式の評価と算術演算
-- [x] 制御構造 (if/else)
+- [x] 制御構造 (if/else/endif)
+- [x] 等価比較演算子 (`==`)
+- [x] アサーション (`assert`, `assert_ne`)
 - [ ] より多くの比較演算子 (`!=`, `<`, `>`, `<=`, `>=`)
+- [ ] 論理演算子 (`&&`, `||`, `!`)
 - [ ] whileループ
 - [ ] 変数への再代入
 - [ ] 関数定義と呼び出し
 - [ ] 配列操作
-- [ ] 構造体サポート
 - [ ] ファイルI/O拡張
 
 ### ⏳ マイルストーン 2: Stage 1完成 (目標: 2026年6月)
@@ -229,22 +241,13 @@ stage0/
 ## プロジェクト統計
 
 ### コード量
-- Stage 0 (Assembly):
-  - ARM64実装:
-    - main.s: ~360行
-    - print.s: ~280行
-    - variables.s: ~508行
-    - expression.s: ~497行
-    - control.s: ~442行
-    - **小計**: ~2,087行
-  - x86_64実装:
-    - main.s: ~330行
-    - print.s: ~276行
-    - variables.s: ~399行
-    - expression.s: ~480行
-    - control.s: ~420行
-    - **小計**: ~1,905行
-  - **合計**: ~3,992行
+- Stage 0 (Rust):
+  - main.rs: ~50行
+  - token.rs: ~260行
+  - ast.rs: ~40行
+  - parser.rs: ~400行
+  - interpreter.rs: ~140行
+  - **合計**: ~890行
 - Stage 1 (INMU言語):
   - Lexer: ~360行
   - Parser: ~470行
@@ -256,19 +259,21 @@ stage0/
 ### ドキュメント
 - README.md
 - BOOTSTRAP.md
+- PROGRESS.md
+- stage0/README.md
 - language-spec.md (421行)
-- compiler-design.md (新規作成)
-- stage1/README.md
+- compiler-design.md
+- verification-guide.md
 
 ## リスク管理
 
 ### 現在のリスク
 
-1. **Stage 0の複雑性増加** (高)
-   - 解決策: アセンブリコードを慎重に設計、十分なテスト
+1. **Stage 0の機能追加** (中)
+   - 解決策: Rustの型安全性を活用、ユニットテストの充実
 
-2. **デバッグの困難さ** (中)
-   - 解決策: 段階的な機能追加、詳細なログ出力
+2. **Stage 1コンパイラの複雑性** (高)
+   - 解決策: 段階的な機能追加、詳細なテストケース
 
 3. **時間不足** (中)
    - 解決策: 優先順位を明確化、MVP(Minimum Viable Product)重視
@@ -277,21 +282,27 @@ stage0/
 
 ### 参考にしている資料
 - "Crafting Interpreters" by Robert Nystrom
-- ARM64 Architecture Reference Manual
 - Rust compiler bootstrap process
+- "Writing An Interpreter In Go" by Thorsten Ball
 - "Engineering a Compiler" by Cooper & Torczon
 
 ## 次のステップ
 
 ### 今週の作業
-1. Stage 0のアセンブリコードに変数システムを追加
-2. 簡単な変数操作のテストを実行
-3. 関数定義の基本構造を設計
+1. ✅ Stage 0のRust実装完成
+2. ✅ 基本機能のテスト完了
+3. 変数への再代入機能の実装
 
 ### 来週の作業
-4. 関数呼び出しスタックの実装
-5. if/else制御構造の追加
-6. Stage 1コンパイラの簡易版をStage 0で実行
+4. より多くの比較演算子の追加
+5. 論理演算子の実装
+6. whileループの実装
+7. 関数定義の基本構造を設計
+
+### 今月の目標
+8. 関数呼び出しの実装
+9. 配列の基本操作
+10. Stage 1コンパイラの簡易版をStage 0で実行
 
 ## 貢献とフィードバック
 

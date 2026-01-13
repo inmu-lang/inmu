@@ -1,0 +1,24 @@
+# Test assertions
+# アサーションのテスト
+
+# Test basic assertions
+assert(10, 10)
+assert(5 + 5, 10)
+assert(20 - 5, 15)
+assert(3 * 4, 12)
+assert(20 / 4, 5)
+
+# Test with variables
+let x = 42
+let y = 42
+assert(x, y)
+
+# Test assert_ne
+assert_ne(10, 20)
+assert_ne(5, 10)
+
+let a = 100
+let b = 200
+assert_ne(a, b)
+
+print "All assertions passed!"
