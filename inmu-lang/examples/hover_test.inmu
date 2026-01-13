@@ -1,0 +1,53 @@
+# ホバー機能テスト
+
+/**
+ * ユーザーの年齢を保存する変数
+ * 18歳以上かどうかをチェックするのに使用
+ */
+let age = 20
+
+/**
+ * ユーザーの名前
+ */
+let name = "Taro"
+
+# JSDocコメントなしの変数
+let counter = 0
+
+# 組み込み関数のテスト
+print "Hello, World!"
+print age
+print name
+
+# アサーション
+assert age == 20
+assert_ne counter != -1
+
+# デバッグ出力
+debug age
+trace "execution point"
+
+# 条件分岐
+if age >= 18 {
+  print "成人です"
+} else {
+  print "未成年です"
+}
+
+# ループ
+while counter < 5 {
+  print counter
+  counter = counter + 1
+}
+
+/**
+ * 2つの数値を加算する関数
+ * 引数: x, y - 加算する数値
+ * 戻り値: xとyの合計
+ */
+fn add(x, y) {
+  return x + y
+}
+
+let result = add(10, 20)
+print result

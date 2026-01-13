@@ -23,6 +23,9 @@
     "lsp"
   ],
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:inmu"
+  ],
   "contributes": {
     "languages": [
       {

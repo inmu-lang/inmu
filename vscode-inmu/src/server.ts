@@ -45,6 +45,7 @@ interface Symbol {
   uri: string;
   line: number;
   character: number;
+  documentation?: string; // JSDocスタイルのコメント
 }
 
 const symbolTable: Map<string, Symbol[]> = new Map();
@@ -126,8 +127,38 @@ function updateSymbolTable(textDocument: TextDocument): void {
   }
 
   // 新しいシンボルを登録
+  let pendingDocComment: string | undefined;
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const trimmed = line.trim();
+    
+    // JSDocスタイルのコメントを検出
+    if (trimmed.startsWith('/**')) {
+      // 複数行のコメントを収集
+      const docLines: string[] = [];
+      let j = i;
+      
+      while (j < lines.length) {
+        const commentLine = lines[j].trim();
+        docLines.push(commentLine);
+        
+        if (commentLine.endsWith('*/')) {
+          break;
+        }
+        j++;
+      }
+      
+      // コメントをパースして整形
+      pendingDocComment = docLines
+        .map(l => l.replace(/^\/\*\*/, '').replace(/\*\/$/, '').replace(/^\s*\*\s?/, ''))
+        .filter(l => l.trim().length > 0)
+        .join('\n')
+        .trim();
+      
+      i = j; // コメント終了位置まで進める
+      continue;
+    }
     
     // 変数宣言を検出: let varname = ...
     const letMatch = line.match(/^\s*let\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
@@ -139,12 +170,16 @@ function updateSymbolTable(textDocument: TextDocument): void {
         kind: 'variable',
         uri,
         line: i,
-        character
+        character,
+        documentation: pendingDocComment
       };
       
       const existing = symbolTable.get(name) || [];
       existing.push(symbol);
       symbolTable.set(name, existing);
+      
+      pendingDocComment = undefined; // コメントを消費
+      continue;
     }
 
     // 関数定義を検出: fn funcname(...) { ... }
@@ -157,12 +192,21 @@ function updateSymbolTable(textDocument: TextDocument): void {
         kind: 'function',
         uri,
         line: i,
-        character
+        character,
+        documentation: pendingDocComment
       };
       
       const existing = symbolTable.get(name) || [];
       existing.push(symbol);
       symbolTable.set(name, existing);
+      
+      pendingDocComment = undefined; // コメントを消費
+      continue;
+    }
+    
+    // コメント以外の行が来たらpendingDocCommentをクリア
+    if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('//')) {
+      pendingDocComment = undefined;
     }
   }
 }
@@ -340,21 +384,21 @@ connection.onCompletion(
         label: 'assert_ne',
         kind: CompletionItemKind.Function,
         detail: '非等価アサーション',
-        documentation: '2つの値が等しくないことを確認します。\n例: assert_ne x != 0',
+        documentation: '2つの値が等しくないことを確認します。\n例: assert_ne x != 0\n等しい場合はエラーを出力します。',
         insertText: 'assert_ne '
       },
       {
         label: 'debug',
         kind: CompletionItemKind.Function,
         detail: 'デバッグ出力',
-        documentation: 'デバッグ情報を出力します。',
+        documentation: 'デバッグ情報を出力します。開発中のトラブルシューティングに使用します。\n例: debug x',
         insertText: 'debug '
       },
       {
         label: 'trace',
         kind: CompletionItemKind.Function,
         detail: 'トレース出力',
-        documentation: 'トレース情報を出力します。',
+        documentation: 'トレース情報を出力します。実行フローを追跡するのに使用します。\n例: trace "checkpoint"',
         insertText: 'trace '
       },
       // 型
@@ -404,20 +448,62 @@ connection.onHover(
 
     const word = wordMatch[1] + (wordAfter ? wordAfter[1] : '');
 
-    // キーワードのホバー情報
+    // キーワードと組み込み関数のホバー情報
     const hoverInfo: Record<string, string> = {
-      'let': '**変数宣言**\n\n変数を宣言して値を代入します。\n\n```inmu\nlet x = 42\n```',
+      'let': '**変数宣言**\n\n変数を宣言して値を代入します。\n\n```inmu\nlet x = 42\nlet name = "INMU"\n```',
       'if': '**条件分岐**\n\n条件式が真の場合にブロックを実行します。\n\n```inmu\nif x > 0 {\n  print "positive"\n}\n```',
-      'print': '**出力関数**\n\n値を標準出力に表示します。\n\n```inmu\nprint "Hello, World!"\nprint x\n```',
-      'assert': '**アサーション**\n\n2つの値が等しいことを検証します。\n\n```inmu\nassert x == 10\n```',
-      'while': '**whileループ**\n\n条件が真の間、ブロックを繰り返し実行します。\n\n```inmu\nwhile i < 10 {\n  print i\n  i = i + 1\n}\n```'
+      'else': '**else節**\n\nif文の条件が偽の場合に実行されるブロックです。\n\n```inmu\nif x > 0 {\n  print "positive"\n} else {\n  print "not positive"\n}\n```',
+      'endif': '**if文の終了**\n\nif文のブロックを終了します。',
+      'while': '**whileループ**\n\n条件が真の間、ブロックを繰り返し実行します。\n\n```inmu\nwhile i < 10 {\n  print i\n  i = i + 1\n}\n```',
+      'for': '**forループ**\n\n指定された回数だけブロックを繰り返し実行します。',
+      'fn': '**関数定義**\n\n新しい関数を定義します。\n\n```inmu\nfn add(x, y) {\n  return x + y\n}\n```',
+      'return': '**戻り値**\n\n関数から値を返します。\n\n```inmu\nfn get_value() {\n  return 42\n}\n```',
+      'print': '**出力関数**\n\n値を標準出力に表示します。\n\n```inmu\nprint "Hello, World!"\nprint x\nprint x + y\n```\n\n**引数:**\n- 任意の値（文字列、数値、式など）',
+      'assert': '**アサーション（等価性チェック）**\n\n2つの値が等しいことを検証します。\n等しくない場合はエラーを出力します。\n\n```inmu\nassert x == 10\nassert result == expected\n```\n\n**引数:**\n- 比較式（`==` を使用）',
+      'assert_ne': '**アサーション（非等価性チェック）**\n\n2つの値が等しくないことを検証します。\n等しい場合はエラーを出力します。\n\n```inmu\nassert_ne x != 0\nassert_ne result != wrong_value\n```\n\n**引数:**\n- 比較式（`!=` を使用）',
+      'debug': '**デバッグ出力**\n\nデバッグ情報を出力します。\n開発中のトラブルシューティングに使用します。\n\n```inmu\ndebug x\ndebug "checkpoint reached"\n```\n\n**引数:**\n- 任意の値',
+      'trace': '**トレース出力**\n\n実行トレース情報を出力します。\nプログラムの実行フローを追跡するのに使用します。\n\n```inmu\ntrace "entering function"\ntrace x\n```\n\n**引数:**\n- 任意の値',
+      'true': '**真偽値: 真**\n\nブール値の真を表します。',
+      'false': '**真偽値: 偽**\n\nブール値の偽を表します。'
     };
 
+    // キーワード/組み込み関数の場合
     if (word in hoverInfo) {
       return {
         contents: {
           kind: MarkupKind.Markdown,
           value: hoverInfo[word]
+        }
+      };
+    }
+
+    // ユーザー定義のシンボルの場合
+    const symbols = symbolTable.get(word);
+    if (symbols && symbols.length > 0) {
+      // 現在のドキュメント内のシンボルを優先
+      const currentUri = params.textDocument.uri;
+      const localSymbol = symbols.find(s => s.uri === currentUri) || symbols[0];
+      
+      let hoverText = '';
+      
+      // 種類に応じたラベル
+      if (localSymbol.kind === 'variable') {
+        hoverText = `**(変数) ${localSymbol.name}**\n\n`;
+      } else if (localSymbol.kind === 'function') {
+        hoverText = `**(関数) ${localSymbol.name}**\n\n`;
+      }
+      
+      // JSDocコメントがあれば追加
+      if (localSymbol.documentation) {
+        hoverText += localSymbol.documentation;
+      } else {
+        hoverText += `定義位置: 行 ${localSymbol.line + 1}`;
+      }
+      
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: hoverText
         }
       };
     }

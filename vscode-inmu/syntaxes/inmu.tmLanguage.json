@@ -29,6 +29,11 @@
     "comments": {
       "patterns": [
         {
+          "name": "comment.block.documentation.inmu",
+          "begin": "/\\*\\*",
+          "end": "\\*/"
+        },
+        {
           "name": "comment.line.number-sign.inmu",
           "match": "#.*$"
         }

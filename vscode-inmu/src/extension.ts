@@ -11,14 +11,25 @@ let client: LanguageClient;
 let terminal: Terminal | undefined;
 
 export function activate(context: ExtensionContext) {
-  console.log('INMU Extension activating...');
+  console.log('[INMU] Extension activating...');
+  window.showInformationMessage('INMU Language Support が起動しました');
   
   // LSPサーバーのパスを指定
   const serverModule = context.asAbsolutePath(
     path.join('out', 'server.js')
   );
   
-  console.log('Server module path:', serverModule);
+  console.log('[INMU] Server module path:', serverModule);
+  
+  // ファイルの存在確認
+  const fs = require('fs');
+  if (fs.existsSync(serverModule)) {
+    console.log('[INMU] Server module found!');
+  } else {
+    console.error('[INMU] Server module NOT found!');
+    window.showErrorMessage('INMU LSP Server が見つかりません: ' + serverModule);
+    return;
+  }
 
   // サーバーのデバッグオプション
   const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
@@ -49,7 +60,14 @@ export function activate(context: ExtensionContext) {
     clientOptions
   );
 
-  client.start();
+  console.log('[INMU] Starting Language Server...');
+  client.start().then(() => {
+    console.log('[INMU] Language Server started successfully!');
+    window.showInformationMessage('INMU LSP サーバーが起動しました');
+  }, (error) => {
+    console.error('[INMU] Failed to start Language Server:', error);
+    window.showErrorMessage('INMU LSP サーバーの起動に失敗しました: ' + error);
+  });
 
   // INMUファイルを実行するコマンド
   const runFileCommand = commands.registerCommand('inmu.runFile', () => {
